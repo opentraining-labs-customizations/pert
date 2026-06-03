@@ -15,6 +15,11 @@ Ansible collection for deploying Red Hat Quick Course content to both local syst
 
 - **playbooks/deploy-quickcourse-ocp.yml**: Example OpenShift deployment playbook
 
+### Documentation
+
+- **[OPENSHIFT_DEPLOYMENT.md](./OPENSHIFT_DEPLOYMENT.md)**: Complete OpenShift deployment guide with all OCP-specific variables and troubleshooting
+- **[examples/ocp-vars-example.yml](./examples/ocp-vars-example.yml)**: Example variables file for OpenShift deployments
+
 ## Installation
 
 ```bash
@@ -39,6 +44,8 @@ ansible-playbook pert.quickcourse.deploy-quickcourse-ocp \
   -e "quickcourse_git_repo=https://github.com/RedHatQuickCourses/aap-on-openshift.git" \
   -e @/path/to/variables.yml
 ```
+
+**📖 For complete OpenShift deployment guide with all OCP variables, see [OPENSHIFT_DEPLOYMENT.md](./OPENSHIFT_DEPLOYMENT.md)**
 
 **Required Variables:**
 - `quickcourse_git_repo`: URL of the Quick Course repository
