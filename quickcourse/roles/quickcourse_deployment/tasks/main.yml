@@ -1,6 +1,60 @@
 ---
-- name: Deploy the quick course interface
+# Validate required parameters
+- name: Validate required parameters
   when: quickcourse_deploy | default(true) | bool
+  block:
+    - name: Ensure quickcourse_git_repo is provided
+      assert:
+        that:
+          - quickcourse_git_repo is defined
+          - quickcourse_git_repo | length > 0
+        fail_msg: |
+          ERROR: quickcourse_git_repo is required but not provided!
+
+          Please provide the Quick Course repository URL via:
+            - Extra vars: -e "quickcourse_git_repo=https://github.com/..."
+            - Playbook vars
+            - Role vars
+
+          Example:
+            ansible-playbook playbook.yml -e "quickcourse_git_repo=https://github.com/RedHatQuickCourses/aap-on-openshift.git"
+        success_msg: "Repository URL: {{ quickcourse_git_repo }}"
+
+# Collect variables for injection into Quick Course content
+- name: Collect variables for Quick Course deployment
+  when: quickcourse_deploy | default(true) | bool
+  block:
+    - name: Auto-collect all user-defined variables
+      set_fact:
+        quickcourse_collected_vars: >-
+          {{
+            vars | dict2items |
+            selectattr('key', 'match', '^(?!ansible_|quickcourse_|f_|r_|__|hostvars|groups|group_names|inventory_).*') |
+            items2dict
+          }}
+      when: quickcourse_auto_collect_vars | default(true) | bool
+
+    - name: Merge custom attributes
+      set_fact:
+        quickcourse_collected_vars: "{{ quickcourse_collected_vars | default({}) | combine(quickcourse_custom_attributes) }}"
+
+# OpenShift Deployment
+- name: Deploy Quick Course to OpenShift
+  when:
+    - quickcourse_deploy | default(true) | bool
+    - quickcourse_deployment_ocp | default('no') in ['yes', 'true', true, 'Yes', 'YES']
+  block:
+    - name: Deploy to OpenShift cluster
+      ansible.builtin.include_tasks:
+        file: 70-quickcourse-deploy-openshift.yml
+      tags:
+        - quickcourse-openshift
+
+# Local Deployment (Bare Metal)
+- name: Deploy Quick Course locally (bare metal)
+  when:
+    - quickcourse_deploy | default(true) | bool
+    - quickcourse_deployment_ocp | default('no') not in ['yes', 'true', true, 'Yes', 'YES']
   block:
 
     - name: Setup OS dependencies and packages

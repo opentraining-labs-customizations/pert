@@ -1,4 +1,0 @@
----
-- name: Post workload tasks complete
-  ansible.builtin.debug:
-    msg: "Quick Course workload tasks completed successfully."

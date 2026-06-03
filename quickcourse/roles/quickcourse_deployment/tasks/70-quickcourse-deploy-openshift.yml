@@ -1,0 +1,149 @@
+---
+# -----------------------------------------------------------------------
+# Deploy Quick Course to OpenShift
+# -----------------------------------------------------------------------
+
+- name: Create OpenShift namespace
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "{{ quickcourse_ocp_namespace }}"
+
+- name: Build variable injection script for antora-playbook.yml
+  set_fact:
+    quickcourse_asciidoc_attributes: |
+      {% for key, value in quickcourse_collected_vars.items() %}
+          {{ key }}: "{{ value }}"
+      {% endfor %}
+
+- name: Create Quick Course Pod with variable injection
+  kubernetes.core.k8s:
+    state: present
+    namespace: "{{ quickcourse_ocp_namespace }}"
+    definition:
+      apiVersion: v1
+      kind: Pod
+      metadata:
+        name: quickcourse
+        labels:
+          app: quickcourse
+      spec:
+        initContainers:
+        - name: builder
+          image: "{{ quickcourse_ocp_builder_image }}"
+          securityContext:
+            runAsUser: 0
+          command: ["/bin/bash"]
+          args:
+          - -xec
+          - |
+            dnf install -y git
+            rm -rf /build/*
+            cd /build
+            git clone {{ quickcourse_git_repo }} .
+            {% if quickcourse_git_ref != 'main' %}
+            git checkout {{ quickcourse_git_ref }}
+            {% endif %}
+            sed -i '/^asciidoc:/,/^ui:/ {
+              /page-pagination:/a\{{ quickcourse_asciidoc_attributes | indent(4) }}
+            }' antora-playbook.yml
+            echo "=== Variables Injected ==="
+            grep -A {{ quickcourse_collected_vars | length + 5 }} "asciidoc:" antora-playbook.yml
+            npm install
+            npm run build
+            cp -r build/site/* /app/
+            echo "=== Build Complete ==="
+            ls -la /app/
+          volumeMounts:
+          - name: app
+            mountPath: /app
+          - name: build
+            mountPath: /build
+        containers:
+        - name: nginx
+          image: "{{ quickcourse_ocp_webserver_image }}"
+          ports:
+          - containerPort: 80
+          volumeMounts:
+          - name: app
+            mountPath: /usr/share/nginx/html
+        volumes:
+        - name: app
+          emptyDir: {}
+        - name: build
+          emptyDir: {}
+
+- name: Create Service for Quick Course
+  kubernetes.core.k8s:
+    state: present
+    namespace: "{{ quickcourse_ocp_namespace }}"
+    definition:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: quickcourse
+        labels:
+          app: quickcourse
+      spec:
+        selector:
+          app: quickcourse
+        ports:
+        - protocol: TCP
+          port: 80
+          targetPort: 80
+
+- name: Create Route for Quick Course
+  kubernetes.core.k8s:
+    state: present
+    namespace: "{{ quickcourse_ocp_namespace }}"
+    definition:
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      metadata:
+        name: quickcourse
+      spec:
+        to:
+          kind: Service
+          name: quickcourse
+        port:
+          targetPort: 80
+        tls:
+          termination: edge
+          insecureEdgeTerminationPolicy: Redirect
+
+- name: Wait for pod to be running
+  kubernetes.core.k8s_info:
+    kind: Pod
+    name: quickcourse
+    namespace: "{{ quickcourse_ocp_namespace }}"
+  register: quickcourse_pod_info
+  until:
+  - quickcourse_pod_info.resources | length > 0
+  - quickcourse_pod_info.resources[0].status.phase == "Running"
+  retries: 60
+  delay: 10
+
+- name: Get Route URL
+  kubernetes.core.k8s_info:
+    kind: Route
+    name: quickcourse
+    namespace: "{{ quickcourse_ocp_namespace }}"
+  register: quickcourse_route_info
+
+- name: Set Quick Course URL fact
+  set_fact:
+    quickcourse_primary_view_url: "https://{{ quickcourse_route_info.resources[0].spec.host }}/"
+
+- name: Display Quick Course URL
+  debug:
+    msg: "Quick Course is accessible at: {{ quickcourse_primary_view_url }}"
+
+- name: Output Quick Course URL (if agnosticd_user_info available)
+  when: agnosticd_user_info is defined
+  agnosticd_user_info:
+    msg: "Quick Course URL: {{ quickcourse_primary_view_url }}"
+    data:
+      quickcourse_url: "{{ quickcourse_primary_view_url }}"

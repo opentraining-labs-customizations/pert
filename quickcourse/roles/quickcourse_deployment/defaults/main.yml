@@ -4,6 +4,10 @@
 # ----------------------------------------------------------------------
 quickcourse_deploy: true
 
+# OpenShift Deployment Toggle
+# Set to 'yes' to deploy on OpenShift, 'no' (default) for local system deployment
+quickcourse_deployment_ocp: no
+
 # ----------------------------------------------------------------------
 # Container Images
 # ----------------------------------------------------------------------
@@ -25,7 +29,9 @@ quickcourse_codeserver_image_tag: latest
 # ----------------------------------------------------------------------
 # Content Repository Configuration
 # ----------------------------------------------------------------------
-quickcourse_git_repo: https://github.com/RedHatQuickCourses/aap-on-openshift.git
+# REQUIRED: Must be provided at runtime via extra-vars or playbook vars
+# Example: quickcourse_git_repo: https://github.com/RedHatQuickCourses/your-course.git
+quickcourse_git_repo: ""
 quickcourse_git_ref: main
 quickcourse_primary_path: "quickcourse"
 
@@ -111,7 +117,24 @@ quickcourse_custom_attributes: {}
 
 # Auto-collect variables from playbook/extra-vars
 # When enabled, ALL playbook variables (except ansible_* and quickcourse_*) are injected
-quickcourse_auto_collect_vars: false
+quickcourse_auto_collect_vars: true
+
+# ----------------------------------------------------------------------
+# OpenShift Deployment Configuration
+# ----------------------------------------------------------------------
+# When quickcourse_deployment_ocp: yes, these variables are used
+
+# OpenShift namespace for deployment
+quickcourse_ocp_namespace: "quickcourse-{{ guid | default('default') }}"
+
+# Builder container image
+quickcourse_ocp_builder_image: "registry.access.redhat.com/ubi9/nodejs-18:latest"
+
+# Web server container image
+quickcourse_ocp_webserver_image: "docker.io/library/nginx:alpine"
+
+# Output variable - URL where Quick Course is accessible
+quickcourse_primary_view_url: ""
 
 # Optional: Exclude specific variables from auto-collection
 quickcourse_auto_collect_exclude:
