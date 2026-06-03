@@ -24,19 +24,14 @@
 - name: Collect variables for Quick Course deployment
   when: quickcourse_deploy | default(true) | bool
   block:
-    - name: Auto-collect all user-defined variables
+    - name: Initialize collected variables dictionary
       set_fact:
-        quickcourse_collected_vars: >-
-          {{
-            vars | dict2items |
-            selectattr('key', 'match', '^(?!ansible_|quickcourse_|f_|r_|__|hostvars|groups|group_names|inventory_).*') |
-            items2dict
-          }}
-      when: quickcourse_auto_collect_vars | default(true) | bool
+        quickcourse_collected_vars: {}
 
-    - name: Merge custom attributes
+    - name: Use custom attributes for variable injection
       set_fact:
-        quickcourse_collected_vars: "{{ quickcourse_collected_vars | default({}) | combine(quickcourse_custom_attributes) }}"
+        quickcourse_collected_vars: "{{ quickcourse_custom_attributes | default({}) }}"
+      when: quickcourse_custom_attributes is defined and quickcourse_custom_attributes | length > 0
 
 # OpenShift Deployment
 - name: Deploy Quick Course to OpenShift

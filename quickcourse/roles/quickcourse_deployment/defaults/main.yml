@@ -113,11 +113,18 @@ quickcourse_supplemental_ui_path: "{{ quickcourse_user_content_dir }}/supplement
 quickcourse_ui_bundle_path: "{{ quickcourse_user_content_dir }}/ui-bundle/ui-bundle.zip"
 
 quickcourse_var_inject: false
+
+# Variable injection - provide variables explicitly via this dictionary
+# All key-value pairs will be injected into Quick Course content as {variable_name}
+# Example:
+#   quickcourse_custom_attributes:
+#     aap_controller_web_url: "https://aap.example.com"
+#     guid: "xxxxx-1"
 quickcourse_custom_attributes: {}
 
-# Auto-collect variables from playbook/extra-vars
-# When enabled, ALL playbook variables (except ansible_* and quickcourse_*) are injected
-quickcourse_auto_collect_vars: true
+# Auto-collection is disabled by default
+# Provide variables via quickcourse_custom_attributes instead
+quickcourse_auto_collect_vars: false
 
 # ----------------------------------------------------------------------
 # OpenShift Deployment Configuration
