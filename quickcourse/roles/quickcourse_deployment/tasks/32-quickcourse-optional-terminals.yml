@@ -1,0 +1,12 @@
+---
+- name: Setup terminal user directories
+  ansible.builtin.file:
+    path: "{{ __quickcourse_terminal_dir }}"
+    state: directory
+    owner: "{{ quickcourse_user }}"
+    group: "{{ quickcourse_user_group }}"
+    mode: "0755"
+  loop:
+    - "{{ quickcourse_user_home_dir }}/.ssh"
+  loop_control:
+    loop_var: __quickcourse_terminal_dir

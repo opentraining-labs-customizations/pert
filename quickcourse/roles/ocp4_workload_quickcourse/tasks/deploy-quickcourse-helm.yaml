@@ -1,0 +1,79 @@
+---
+- name: Print Quick Course namespace information
+  ansible.builtin.debug:
+    msg: "Setting up Quick Course in namespace {{ _quickcourse_namespace }}"
+
+- name: Setup Namespace
+  ansible.builtin.include_tasks: setup-namespace.yaml
+
+- name: Render helm chart with values
+  environment:
+    KUBECONFIG: "{{ _quickcourse_kubeconfig | default(omit) }}"
+  kubernetes.core.helm_template:
+    chart_repo_url: "{{ ocp4_workload_quickcourse_chart_package_url }}"
+    chart_ref: "{{ ocp4_workload_quickcourse_deployer_chart_name }}"
+    chart_version: "{{ ocp4_workload_quickcourse_deployer_chart_version }}"
+    release_name: "{{ ocp4_workload_quickcourse_name }}"
+    release_namespace: "{{ _quickcourse_namespace }}"
+    release_values:
+      content:
+        title: "{{ ocp4_workload_quickcourse_content_title }}"
+        image: "{{ ocp4_workload_quickcourse_content_image }}"
+        user_data: "{{ _quickcourse_vars | to_nice_yaml(width=1337, default_style='\"') }}"
+        repoUrl: "{{ ocp4_workload_quickcourse_content_git_repo }}"
+        repoRef: "{{ ocp4_workload_quickcourse_content_git_repo_ref }}"
+        antoraPlaybook: "{{ ocp4_workload_quickcourse_content_antora_playbook }}"
+        contentOnly: "{{ ocp4_workload_quickcourse_content_only | bool | string | lower }}"
+
+      guid: "{{ guid }}"
+      deployer:
+        domain: "{{ _deployer_domain }}"
+      route:
+        hostSuffix: "{{ _quickcourse_user | default('') }}"
+        omitHost: "{{ (ocp4_workload_quickcourse_route_omit_host | bool) | ternary('true','false') }}"
+
+      # Terminal configuration (defaults to disabled for quick courses)
+      stacked_terminals:
+        setup: "{{ ocp4_workload_quickcourse_stacked_terminals_enable | bool | string | lower }}"
+        display_name: "{{ ocp4_workload_quickcourse_stacked_terminals_display_name }}"
+        top: "{{ 'terminal' if ocp4_workload_quickcourse_terminal_type == 'showroom' else ocp4_workload_quickcourse_terminal_type }}"
+        bottom: "{{ 'terminal' if ocp4_workload_quickcourse_terminal_type == 'showroom' else ocp4_workload_quickcourse_terminal_type }}"
+      second_terminal_tab:
+        setup: "{{ (true if ( ocp4_workload_quickcourse_second_terminal_tab_enable
+                         and not ocp4_workload_quickcourse_stacked_terminals_enable )
+                         else false) | bool | string | lower }}"
+        display_name: "{{ ocp4_workload_quickcourse_second_terminal_tab_display_name }}"
+      terminal:
+        setup: "{{ (true if ocp4_workload_quickcourse_terminal_type == 'showroom' else false) | bool | string | lower }}"
+        image: "{{ ocp4_workload_quickcourse_terminal_image }}"
+        resources:
+          requests:
+            cpu: "{{ ocp4_workload_quickcourse_terminal_requests_cpu }}"
+            memory: "{{ ocp4_workload_quickcourse_terminal_requests_memory }}"
+          limits:
+            cpu: "{{ ocp4_workload_quickcourse_terminal_limits_cpu }}"
+            memory: "{{ ocp4_workload_quickcourse_terminal_limits_memory }}"
+      wetty:
+        setup: "{{ (true if ocp4_workload_quickcourse_terminal_type == 'wetty' else false) | bool | string | lower }}"
+        image: "{{ ocp4_workload_quickcourse_wetty_image }}"
+        resources:
+          requests:
+            cpu: "{{ ocp4_workload_quickcourse_terminal_requests_cpu }}"
+            memory: "{{ ocp4_workload_quickcourse_terminal_requests_memory }}"
+          limits:
+            cpu: "{{ ocp4_workload_quickcourse_terminal_limits_cpu }}"
+            memory: "{{ ocp4_workload_quickcourse_terminal_limits_memory }}"
+        ssh:
+          autoSshToBastion: "{{ (true if ocp4_workload_quickcourse_wetty_ssh_bastion_login | bool else false) | bool | string | lower }}"
+          sshAuth: password
+          sshHost: "{{ _quickcourse_user_data.bastion_public_hostname }}"
+          sshUser: "{{ _quickcourse_user_data['users'][_quickcourse_user].bastion_ssh_user_name | default(_quickcourse_user_data.bastion_ssh_user_name) }}"
+          sshPass: "{{ _quickcourse_user_data['users'][_quickcourse_user].bastion_ssh_password | default(_quickcourse_user_data.bastion_ssh_password) }}"
+          sshPort: "{{ _quickcourse_user_data.bastion_ssh_port | default(22) }}"
+
+  register: r_helm_templates
+
+- name: Deploy rendered manifests to OpenShift
+  kubernetes.core.k8s:
+    kubeconfig: "{{ _quickcourse_kubeconfig | default(omit) }}"
+    definition: "{{ r_helm_templates.stdout | from_yaml_all }}"

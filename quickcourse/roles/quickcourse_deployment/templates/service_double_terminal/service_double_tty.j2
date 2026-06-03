@@ -1,0 +1,75 @@
+{% set _provider = (quickcourse_tls_provider | default(certbot_cert_manager_provider, true) | default('zerossl')) | lower %}
+{% set _entrypoint = 'web' if _provider == 'none' else 'websecure' %}
+tty-top:
+  image: {{ quickcourse_tty_image }}:{{ quickcourse_tty_image_tag }}
+  container_name: tty-top
+  hostname: tty-top
+{% if quickcourse_ssh_method == 'sshkey' %}
+  volumes:
+    - "{{ quickcourse_user_home_dir }}/.ssh:{{ quickcourse_user_home_dir }}/.ssh"
+{% endif %}
+  command:
+    - "--ssh-user={{ quickcourse_tab_double_tty_top_username }}"
+{% if quickcourse_ssh_method == 'sshkey' %}
+    - "--ssh-config={{ quickcourse_user_home_dir }}/.ssh/config"
+    - "--ssh-key={{ quickcourse_user_home_dir }}/.ssh/id_{{ quickcourse_ssh_key_type }}"
+    - "--ssh-auth=publickey"
+{% elif quickcourse_ssh_method == 'password' %}
+    - "--ssh-pass={{ quickcourse_ssh_password | default(f_user_data.default_ssh_password) | default(f_user_data.ssh_password) }}"
+{% endif %}
+    - "--ssh-host={{ quickcourse_ssh_host | default(f_user_data.targethost) }}"
+    - "--ssh-port={{ quickcourse_ssh_port | default(f_user_data.targetport) | default(22) }}"
+    - "--base=/tty-top"
+{% if quickcourse_ttys_enable_tmux %}
+    - "--command=/usr/local/bin/quickcourse-tmux top"
+{% endif %}
+    - "--allow-iframe=true"
+  labels:
+    - "traefik.enable=true"
+    - "traefik.http.services.tty-top.loadbalancer.server.port=3000"
+    - "traefik.http.routers.tty-top.entrypoints={{ _entrypoint }}"
+{% if _provider != 'none' %}
+    - "traefik.http.routers.tty-top.tls.certresolver={{ _provider }}"
+{% endif %}
+    - "traefik.http.routers.tty-top.rule=Host(`{{ quickcourse_host }}`) && PathPrefix(`/tty-top`)"
+    - "traefik.http.routers.tty-top.middlewares=terminal-stripprefix"
+    - "traefik.http.routers.tty-top.middlewares=tty-toptheader"
+    - "traefik.http.middlewares.tty-top-stripprefix.stripprefix.prefixes=/tty-top"
+    - "traefik.http.middlewares.tty-toptheader.headers.customrequestheaders.X-Content-Type-Options=false"
+
+tty-bottom:
+  image: {{ quickcourse_tty_image }}:{{ quickcourse_tty_image_tag }}
+  container_name: tty-bottom
+  hostname: tty-bottom
+{% if quickcourse_ssh_method == 'sshkey' %}
+  volumes:
+    - "{{ quickcourse_user_home_dir }}/.ssh:{{ quickcourse_user_home_dir }}/.ssh"
+{% endif %}
+  command:
+    - "--ssh-user={{ quickcourse_tab_double_tty_bottom_username }}"
+{% if quickcourse_ssh_method == 'sshkey' %}
+    - "--ssh-config={{ quickcourse_user_home_dir }}/.ssh/config"
+    - "--ssh-key={{ quickcourse_user_home_dir }}/.ssh/id_{{ quickcourse_ssh_key_type }}"
+    - "--ssh-auth=publickey"
+{% elif quickcourse_ssh_method == 'password' %}
+    - "--ssh-pass={{ quickcourse_ssh_password | default(f_user_data.default_ssh_password) | default(f_user_data.ssh_password) }}"
+{% endif %}
+    - "--ssh-host={{ quickcourse_ssh_host | default(f_user_data.targethost) }}"
+    - "--ssh-port={{ quickcourse_ssh_port | default(f_user_data.targetport) | default(22) }}"
+    - "--base=/tty-bottom"
+{% if quickcourse_ttys_enable_tmux %}
+    - "--command=/usr/local/bin/quickcourse-tmux bottom"
+{% endif %}
+    - "--allow-iframe=true"
+  labels:
+    - "traefik.enable=true"
+    - "traefik.http.services.tty-bottom.loadbalancer.server.port=3000"
+    - "traefik.http.routers.tty-bottom.entrypoints={{ _entrypoint }}"
+{% if _provider != 'none' %}
+    - "traefik.http.routers.tty-bottom.tls.certresolver={{ _provider }}"
+{% endif %}
+    - "traefik.http.routers.tty-bottom.rule=Host(`{{ quickcourse_host }}`) && PathPrefix(`/tty-bottom`)"
+    - "traefik.http.routers.tty-bottom.middlewares=terminal-stripprefix"
+    - "traefik.http.routers.tty-bottom.middlewares=tty-bottomtheader"
+    - "traefik.http.middlewares.tty-bottom-stripprefix.stripprefix.prefixes=/tty-bottom"
+    - "traefik.http.middlewares.tty-bottomtheader.headers.customrequestheaders.X-Content-Type-Options=false"

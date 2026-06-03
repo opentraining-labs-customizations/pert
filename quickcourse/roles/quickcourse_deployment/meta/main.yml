@@ -1,0 +1,25 @@
+---
+galaxy_info:
+  author: Red Hat Training Team
+  description: Ansible role for deploying Red Hat Quick Course content
+  company: Red Hat
+  license: GPL-2.0-or-later
+  min_ansible_version: "2.9"
+
+  platforms:
+    - name: Fedora
+      versions:
+        - all
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+
+  galaxy_tags:
+    - quickcourse
+    - antora
+    - documentation
+    - training
+    - redhat
+
+dependencies: []

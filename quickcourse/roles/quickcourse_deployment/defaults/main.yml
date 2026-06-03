@@ -1,0 +1,153 @@
+---
+# ----------------------------------------------------------------------
+# Deployment Control
+# ----------------------------------------------------------------------
+quickcourse_deploy: true
+
+# ----------------------------------------------------------------------
+# Container Images
+# ----------------------------------------------------------------------
+quickcourse_antora_image: quay.io/redhat-gpte/showroom/antora
+quickcourse_antora_image_tag: latest
+
+quickcourse_reverse_proxy_image: quay.io/rhpds/traefik
+quickcourse_reverse_proxy_image_tag: v2
+
+quickcourse_httpd_image: quay.io/redhat-gpte/showroom/httpd
+quickcourse_httpd_image_tag: latest
+
+quickcourse_tty_image: quay.io/rhpds/wetty
+quickcourse_tty_image_tag: v2
+
+quickcourse_codeserver_image: quay.io/redhat-gpte/showroom/code-server
+quickcourse_codeserver_image_tag: latest
+
+# ----------------------------------------------------------------------
+# Content Repository Configuration
+# ----------------------------------------------------------------------
+quickcourse_git_repo: https://github.com/RedHatQuickCourses/aap-on-openshift.git
+quickcourse_git_ref: main
+quickcourse_primary_path: "quickcourse"
+
+# ----------------------------------------------------------------------
+# Node.js Build Configuration
+# ----------------------------------------------------------------------
+quickcourse_nodejs_version: "18"
+quickcourse_npm_install: true
+quickcourse_npm_build: true
+quickcourse_build_command: "npm run build"
+
+# ----------------------------------------------------------------------
+# Service Configuration
+# ----------------------------------------------------------------------
+quickcourse_primary_port: 443
+quickcourse_http_port: 80
+quickcourse_frontend_service: traefik
+
+quickcourse_user: quickcourse
+quickcourse_user_group: quickcourse
+quickcourse_user_uid: 1889
+quickcourse_user_home_dir: /opt/quickcourse
+quickcourse_user_orchestration_dir: "{{ quickcourse_user_home_dir }}/orchestration"
+quickcourse_user_content_dir: "{{ quickcourse_user_home_dir }}/content"
+quickcourse_user_build_dir: "{{ quickcourse_user_content_dir }}/build/site"
+
+# ----------------------------------------------------------------------
+# Optional Terminal Support
+# ----------------------------------------------------------------------
+quickcourse_enable_terminals: false
+quickcourse_ssh_method: password
+quickcourse_ssh_key_type: ed25519
+quickcourse_enable_root_ssh: false
+quickcourse_lab_users:
+  - rhel
+
+quickcourse_tab_services: []
+
+# ----------------------------------------------------------------------
+# Package Dependencies
+# ----------------------------------------------------------------------
+quickcourse_dnf_packages:
+  - git
+  - podman
+  - python3-devel
+  - systemd-container
+  - unzip
+
+quickcourse_pip_packages:
+  - podman-compose
+
+quickcourse_nodejs_install_method: dnf
+
+# ----------------------------------------------------------------------
+# Working Directories
+# ----------------------------------------------------------------------
+quickcourse_work_dirs:
+  - "{{ quickcourse_user_home_dir }}/content"
+  - "{{ quickcourse_user_home_dir }}/orchestration"
+
+# ----------------------------------------------------------------------
+# TLS and ACME Configuration
+# ----------------------------------------------------------------------
+quickcourse_tls_provider: zerossl
+quickcourse_acme_email: john.doe@rhdp.net
+
+quickcourse_acme_zerossl_caserver: https://acme.zerossl.com/v2/DV90
+quickcourse_acme_zerossl_acme_challenge: http
+quickcourse_acme_zerossl_eab_kid: ""
+quickcourse_acme_zerossl_eab_hmac_key: ""
+
+quickcourse_acme_letsencrypt_caserver: https://acme-v02.api.letsencrypt.org/directory
+quickcourse_acme_letsencrypt_acme_challenge: tlsalpn
+
+# ----------------------------------------------------------------------
+# Customization Options
+# ----------------------------------------------------------------------
+quickcourse_supplemental_ui_path: "{{ quickcourse_user_content_dir }}/supplemental-ui"
+quickcourse_ui_bundle_path: "{{ quickcourse_user_content_dir }}/ui-bundle/ui-bundle.zip"
+
+quickcourse_var_inject: false
+quickcourse_custom_attributes: {}
+
+# Auto-collect variables from playbook/extra-vars
+# When enabled, ALL playbook variables (except ansible_* and quickcourse_*) are injected
+quickcourse_auto_collect_vars: false
+
+# Optional: Exclude specific variables from auto-collection
+quickcourse_auto_collect_exclude:
+  - "hostvars"
+  - "groups"
+  - "group_names"
+  - "inventory_hostname"
+  - "inventory_hostname_short"
+  - "inventory_dir"
+  - "inventory_file"
+  - "playbook_dir"
+  - "role_path"
+  - "omit"
+  - "discovered_interpreter_python"
+  - "module_setup"
+
+# ----------------------------------------------------------------------
+# Systemd Service Templates
+# ----------------------------------------------------------------------
+quickcourse_container_compose_template: container-compose.yml.j2
+quickcourse_systemd_service_template: quickcourse.service.j2
+quickcourse_systemd_service_start: quickcourse-start.j2
+quickcourse_systemd_service_stop: quickcourse-stop.j2
+
+# ----------------------------------------------------------------------
+# Base Services
+# ----------------------------------------------------------------------
+quickcourse_base_services:
+  - traefik_httpd
+
+# ----------------------------------------------------------------------
+# Podman Network
+# ----------------------------------------------------------------------
+quickcourse_podman_network: quickcourse_network
+
+# ----------------------------------------------------------------------
+# Ansible Executable
+# ----------------------------------------------------------------------
+quickcourse_preffered_ansible_exec: /usr/bin/ansible-playbook

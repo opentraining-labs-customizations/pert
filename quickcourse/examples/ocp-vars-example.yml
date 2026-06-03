@@ -1,0 +1,34 @@
+---
+# Example variables for Quick Course OpenShift Deployment
+# All variables defined here will be auto-collected and injected into Quick Course content
+#
+# Usage:
+#   ansible-playbook playbooks/deploy-quickcourse-ocp.yml -e @examples/ocp-vars-example.yml
+
+# OpenShift Environment Variables
+aap_controller_web_url: "https://aap-aap.apps.cluster-xxxxx.dynamic2.redhatworkshops.io"
+aap_controller_admin_user: "admin"
+aap_controller_admin_password: "changeme"
+
+gitea_console_url: "https://gitea.apps.cluster-xxxxx.dynamic2.redhatworkshops.io"
+gitea_admin_username: "opentlc-mgr"
+gitea_admin_password: "changeme"
+gitea_user: "user1"
+gitea_password: "changeme"
+
+openshift_cluster_console_url: "https://console-openshift-console.apps.cluster-xxxxx.dynamic2.redhatworkshops.io"
+openshift_cluster_admin_username: "admin"
+openshift_cluster_admin_password: "changeme"
+openshift_cluster_ingress_domain: "apps.cluster-xxxxx.dynamic2.redhatworkshops.io"
+openshift_api_server_url: "https://api.cluster-xxxxx.dynamic2.redhatworkshops.io:6443"
+
+ssh_command: "ssh lab-user@ssh.example.com -p 22"
+ssh_password: "changeme"
+ssh_address: "ssh.example.com"
+ssh_port: "22"
+ssh_username: "lab-user"
+
+guid: "xxxxx-1"
+
+# Any other custom variables you want to inject
+# They will be available in Quick Course content as {variable_name}

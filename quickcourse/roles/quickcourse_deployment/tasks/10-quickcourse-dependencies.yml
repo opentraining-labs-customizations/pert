@@ -1,0 +1,39 @@
+---
+- name: Ensure Linux Package dependencies for Quick Course
+  ansible.builtin.package:
+    name: "{{ quickcourse_dnf_packages }}"
+    state: present
+
+- name: Ensure Python dependencies for Quick Course
+  ansible.builtin.pip:
+    name: "{{ quickcourse_pip_packages }}"
+    state: present
+
+- name: Install Node.js via DNF
+  when: quickcourse_nodejs_install_method == "dnf"
+  block:
+    - name: Install Node.js from distribution repository
+      ansible.builtin.package:
+        name:
+          - nodejs
+          - npm
+        state: present
+
+- name: Install Node.js via NodeSource
+  when: quickcourse_nodejs_install_method == "nodesource"
+  block:
+    - name: Download NodeSource setup script
+      ansible.builtin.get_url:
+        url: "https://rpm.nodesource.com/setup_{{ quickcourse_nodejs_version }}.x"
+        dest: /tmp/nodesource_setup.sh
+        mode: '0755'
+
+    - name: Run NodeSource setup script
+      ansible.builtin.command: /tmp/nodesource_setup.sh
+      changed_when: true
+
+    - name: Install Node.js from NodeSource
+      ansible.builtin.package:
+        name:
+          - nodejs
+        state: present

@@ -1,0 +1,7 @@
+#!/usr/bin/bash
+
+export QUICKCOURSE_COMPOSE_FILE={{ quickcourse_user_orchestration_dir }}/container-compose.yml
+
+/usr/local/bin/podman-compose \
+  -f $QUICKCOURSE_COMPOSE_FILE \
+  down

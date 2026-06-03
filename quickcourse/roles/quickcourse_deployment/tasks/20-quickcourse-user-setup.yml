@@ -1,0 +1,82 @@
+---
+- name: "Create quick course user {{ quickcourse_user }}"
+  ansible.builtin.user:
+    name: "{{ quickcourse_user }}"
+    home: "{{ quickcourse_user_home_dir }}"
+    uid: "{{ quickcourse_user_uid }}"
+    password: "{{ quickcourse_user_password | default(common_password) | password_hash('sha512') }}"
+
+- name: Setup persistent working directories
+  ansible.builtin.file:
+    path: "{{ __quickcourse_work_dir }}"
+    state: directory
+    owner: "{{ quickcourse_user }}"
+    group: "{{ quickcourse_user_group }}"
+    mode: "0755"
+  loop: "{{ quickcourse_work_dirs }}"
+  loop_control:
+    loop_var: __quickcourse_work_dir
+
+- name: Add passwordless sudo for {{ quickcourse_user }}
+  ansible.builtin.lineinfile:
+    path: /etc/sudoers
+    regexp: "^{{ quickcourse_user }}"
+    line: "{{ quickcourse_user }} ALL=(ALL) NOPASSWD: ALL"
+
+- name: User and system configuration when using traefik
+  when: quickcourse_frontend_service == "traefik"
+  block:
+
+    - name: Allow users to open ports 80 and up without sudo
+      ansible.posix.sysctl:
+        name: net.ipv4.ip_unprivileged_port_start
+        value: '80'
+        state: present
+        reload: true
+
+    - name: Create acme.json for ACME called via traefik
+      ansible.builtin.file:
+        path: "{{ quickcourse_user_orchestration_dir }}/acme.json"
+        state: touch
+        owner: "{{ quickcourse_user }}"
+        group: "{{ quickcourse_user_group }}"
+        mode: "0600"
+        modification_time: preserve
+        access_time: preserve
+
+    - name: Enable root password for machinectl privileges
+      ansible.builtin.user:
+        name: root
+        password: |-
+          {{ quickcourse_user_password | default(generated_password) | default(common_password) | password_hash('sha512') }}
+
+    - name: "Enable linger for the quickcourse_user"
+      ansible.builtin.command: "loginctl enable-linger {{ quickcourse_user }}"
+      become: true
+      changed_when: true
+
+    - name: Manage user systemd service with become
+      ansible.builtin.systemd:
+        name: podman.socket
+        state: started
+        enabled: true
+        scope: user
+      become: true
+      become_user: "{{ quickcourse_user }}"
+      environment:
+        XDG_RUNTIME_DIR: "/run/user/{{ quickcourse_user_uid }}"
+        DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ quickcourse_user_uid }}/bus"
+
+    - name: Setup quickcourse user socket playbook
+      ansible.builtin.template:
+        src: quickcourse-user-socket.yml.j2
+        dest: "/usr/local/bin/quickcourse-user-socket.yml"
+        owner: "{{ quickcourse_user }}"
+        group: "{{ quickcourse_user_group }}"
+        mode: "0644"
+
+    - name: Create a Podman network for quickcourse and traefik
+      containers.podman.podman_network:
+        name: "{{ quickcourse_podman_network | default('quickcourse_network') }}"
+        state: present
+      become_user: "{{ quickcourse_user }}"

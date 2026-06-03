@@ -1,0 +1,100 @@
+---
+- name: Clone and Build Quick Course
+  block:
+
+    - name: Clone quick course primary repo
+      when: not quickcourse_skip_git_clone | default(false) | bool
+      ansible.builtin.git:
+        repo: "{{ quickcourse_git_repo }}"
+        dest: "{{ quickcourse_user_content_dir }}"
+        force: true
+        version: "{{ quickcourse_git_ref | default('main') }}"
+      become_user: "{{ quickcourse_user }}"
+
+    - name: Install npm dependencies
+      when: quickcourse_npm_install | default(true) | bool
+      block:
+        - name: Run npm install
+          ansible.builtin.command:
+            cmd: npm install
+            chdir: "{{ quickcourse_user_content_dir }}"
+          become_user: "{{ quickcourse_user }}"
+          changed_when: true
+
+    - name: Fix AsciiDoc variable syntax (remove spaces)
+      when: quickcourse_var_inject | default(false) | bool
+      ansible.builtin.command:
+        cmd: find {{ quickcourse_user_content_dir }}/modules -name "*.adoc" -type f -exec sed -i 's/{{ '{{' }} \([a-zA-Z_][a-zA-Z0-9_]*\) {{ '}}' }}/{{ '{{' }}\1{{ '}}' }}/g' {} +
+      become_user: "{{ quickcourse_user }}"
+      changed_when: true
+
+    - name: Build quick course with npm
+      when: quickcourse_npm_build | default(true) | bool
+      block:
+        - name: Run npm build
+          ansible.builtin.command:
+            cmd: "{{ quickcourse_build_command }}"
+            chdir: "{{ quickcourse_user_content_dir }}"
+          become_user: "{{ quickcourse_user }}"
+          changed_when: true
+          register: r_npm_build
+
+        - name: Debug npm build output
+          ansible.builtin.debug:
+            var: r_npm_build
+            verbosity: 2
+
+    - name: Optional variable injection into Antora configuration
+      when: quickcourse_var_inject | default(false) | bool
+      block:
+
+        - name: Set f_user_data
+          ansible.builtin.set_fact:
+            f_user_data: "{{ lookup('agnosticd_user_data', '*', errors='ignore') | default({}) | from_yaml }}"
+          failed_when: false
+
+        - name: Auto-collect user-defined variables from playbook (if enabled)
+          when: quickcourse_auto_collect_vars | default(false) | bool
+          ansible.builtin.set_fact:
+            f_auto_collected: >-
+              {%- set collected = {} -%}
+              {%- set exclude_list = quickcourse_auto_collect_exclude | default([]) -%}
+              {%- set exclude_prefixes = ['ansible_', 'quickcourse_', 'f_', 'r_', '__'] -%}
+              {%- for var_name, var_value in vars.items() -%}
+                {%- set should_exclude = false -%}
+                {%- for prefix in exclude_prefixes -%}
+                  {%- if var_name.startswith(prefix) -%}
+                    {%- set should_exclude = true -%}
+                  {%- endif -%}
+                {%- endfor -%}
+                {%- if not should_exclude
+                   and var_name not in exclude_list
+                   and (var_value is string or var_value is number) -%}
+                  {%- set _ = collected.update({var_name: var_value | string}) -%}
+                {%- endif -%}
+              {%- endfor -%}
+              {{ collected }}
+
+        - name: Merge all custom attributes
+          ansible.builtin.set_fact:
+            f_merged_attributes: "{{ f_user_data | default({}) | combine(quickcourse_custom_attributes) | combine(f_auto_collected | default({})) }}"
+
+        - name: Fetch antora-playbook.yml from the quick course content dir
+          ansible.builtin.slurp:
+            src: "{{ quickcourse_user_content_dir }}/antora-playbook.yml"
+          register: r_slurp_playbook_yml
+
+        - name: Parse antora-playbook.yml
+          ansible.builtin.set_fact:
+            f_playbook_config: "{{ r_slurp_playbook_yml.content | b64decode | from_yaml }}"
+
+        - name: Inject custom attributes into antora-playbook.yml
+          ansible.builtin.copy:
+            content: >-
+              {{ f_playbook_config | combine(__attribute_update, recursive=true) | to_nice_yaml(indent=2) }}
+            dest: "{{ quickcourse_user_content_dir }}/antora-playbook.yml"
+          vars:
+            __existing_attributes: "{{ f_playbook_config.asciidoc.attributes | default({}) }}"
+            __attribute_update:
+              asciidoc:
+                attributes: "{{ __existing_attributes | combine(f_merged_attributes) }}"

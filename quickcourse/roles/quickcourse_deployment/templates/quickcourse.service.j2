@@ -1,0 +1,20 @@
+[Unit]
+Description=Quick Course Service
+Documentation=man:podman-generate-systemd(1)
+Wants=network.target
+After=network-online.target
+
+[Service]
+User={{ quickcourse_user }}
+Group={{ quickcourse_user_group }}
+Environment=PODMAN_SYSTEMD_UNIT=%n
+{% if quickcourse_frontend_service == "traefik" %}
+ExecStart={{ quickcourse_preffered_ansible_exec | default('/usr/bin/ansible-playbook') }} /usr/local/bin/quickcourse-user-socket.yml
+{% endif %}
+ExecStart=/usr/local/bin/quickcourse-start.sh
+ExecStop=/usr/local/bin/quickcourse-stop.sh
+Type=oneshot
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target default.target

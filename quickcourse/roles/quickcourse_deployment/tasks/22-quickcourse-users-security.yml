@@ -1,0 +1,89 @@
+---
+
+- name: Implement internal sshkeys and configs for quickcourse access
+  when: quickcourse_ssh_method == "password"
+  block:
+
+    - name: Enable ssh password authentication
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^PasswordAuthentication'
+        line: 'PasswordAuthentication yes'
+        backrefs: true
+
+    - name: Set correct password for quickcourse ssh accounts
+      ansible.builtin.user:
+        name: "{{ __quickcourse_lab_user }}"
+        password: |-
+          {{ quickcourse_user_password | default(common_password) | password_hash('sha512') }}
+      loop: "{{ quickcourse_lab_users }}"
+      loop_control:
+        loop_var: __quickcourse_lab_user
+
+- name: Implement internal sshkeys and configs for quickcourse access
+  when: quickcourse_ssh_method == "sshkey"
+  block:
+
+    - name: Setup quickcourse user .ssh directory
+      ansible.builtin.file:
+        path: "{{ quickcourse_user_home_dir }}/.ssh"
+        state: directory
+        owner: "{{ quickcourse_user | default('quickcourse') }}"
+        group: "{{ quickcourse_user_group | default('quickcourse') }}"
+        mode: "0700"
+
+    - name: Generate OpenSSH keypair
+      when: quickcourse_openssh_keypair == 'generate'
+      block:
+        - name: Generate an ed25519 OpenSSH keypair for quickcourse
+          community.crypto.openssh_keypair:
+            path: "{{ quickcourse_user_home_dir }}/.ssh/id_ed25519"
+            type: ed25519
+            comment: "{{ quickcourse_user }}@localhost.com"
+          become_user: "{{ quickcourse_user }}"
+          register: r_ssh_key
+
+        - name: Inject sshkey into the quickcourse_lab_users authorized_keys
+          ansible.posix.authorized_key:
+            user: "{{ __quickcourse_lab_user }}"
+            state: present
+            key: "{{ r_ssh_key.public_key }}"
+          loop: "{{ quickcourse_lab_users }}"
+          loop_control:
+            loop_var: __quickcourse_lab_user
+
+    - name: Use environment provision OpenSSH keypair
+      when: quickcourse_openssh_keypair == 'provisionkey'
+      block:
+        - name: Copy provision OpenSSH private key to id_ed25519 for quickcourse
+          ansible.builtin.copy:
+            src: "{{ hostvars.localhost.ssh_provision_key_path
+                  | default(hostvars.localhost.env_authorized_key_path) }}"
+            dest: "{{ quickcourse_user_home_dir }}/.ssh/id_ed25519"
+            owner: "{{ quickcourse_user | default('quickcourse') }}"
+            group: "{{ quickcourse_user_group | default('quickcourse') }}"
+            mode: "0400"
+
+        - name: Copy provision OpenSSH public key to id_ed25519.pub for quickcourse
+          ansible.builtin.copy:
+            content: "{{ hostvars.localhost.ssh_provision_pubkey_content
+              | default(hostvars.localhost.env_authorized_key_content_pub) }}"
+            dest: "{{ quickcourse_user_home_dir }}/.ssh/id_ed25519.pub"
+            owner: "{{ quickcourse_user | default('quickcourse') }}"
+            group: "{{ quickcourse_user_group | default('quickcourse') }}"
+            mode: "0400"
+
+        - name: Inject sshkey into the quickcourse_lab_users authorized_keys
+          ansible.posix.authorized_key:
+            user: "{{ __quickcourse_lab_user }}"
+            state: present
+            key: "{{ hostvars.localhost.ssh_provision_pubkey_content
+              | default(hostvars.localhost.env_authorized_key_content_pub) }}"
+          loop: "{{ quickcourse_lab_users }}"
+          loop_control:
+            loop_var: __quickcourse_lab_user
+
+- name: Restart sshd to pickup all/any changes
+  ansible.builtin.systemd:
+    name: sshd
+    state: restarted

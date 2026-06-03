@@ -1,0 +1,53 @@
+---
+- name: Insert quick course orchestration files
+  ansible.builtin.template:
+    src: "{{ __orchestration.src }}"
+    dest: "{{ __orchestration.dest }}"
+    owner: "{{ __orchestration.owner | default(quickcourse_user) }}"
+    group: "{{ __orchestration.group | default(quickcourse_user_group) }}"
+    mode: "{{ __orchestration.mode | default('0644') }}"
+  loop:
+    - src: "{{ quickcourse_container_compose_template }}"
+      dest: "{{ quickcourse_user_orchestration_dir }}/container-compose.yml"
+    - src: "{{ quickcourse_systemd_service_template }}"
+      dest: "/etc/systemd/system/quickcourse.service"
+      owner: root
+      group: root
+    - src: "{{ quickcourse_systemd_service_start }}"
+      dest: "/usr/local/bin/quickcourse-start.sh"
+      owner: root
+      group: root
+      mode: "0755"
+    - src: "{{ quickcourse_systemd_service_stop }}"
+      dest: "/usr/local/bin/quickcourse-stop.sh"
+      owner: root
+      group: root
+      mode: "0755"
+  loop_control:
+    loop_var: __orchestration
+
+- name: Enable and Start quick course service
+  ansible.builtin.service:
+    name: quickcourse.service
+    enabled: true
+    state: started
+
+- name: Pause before TLS verification attempts
+  when: (quickcourse_tls_provider | default('zerossl') | lower) != 'none'
+  ansible.builtin.pause:
+    seconds: 120
+
+- name: Verify TLS and restart on failure
+  when: (quickcourse_tls_provider | default('zerossl') | lower) != 'none'
+  ansible.builtin.set_fact:
+    f_tls_verified: false
+
+- name: Verify TLS and restart on failure (up to 3 attempts)
+  ansible.builtin.include_tasks:
+    file: verify_tls_attempt.yml
+  loop: "{{ range(1, 4) | list }}"
+  loop_control:
+    loop_var: tls_attempt
+  when:
+    - (quickcourse_tls_provider | default('zerossl') | lower) != 'none'
+    - not f_tls_verified | default(false)

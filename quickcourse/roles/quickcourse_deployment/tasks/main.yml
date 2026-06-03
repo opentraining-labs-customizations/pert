@@ -1,0 +1,56 @@
+---
+- name: Deploy the quick course interface
+  when: quickcourse_deploy | default(true) | bool
+  block:
+
+    - name: Setup OS dependencies and packages
+      ansible.builtin.include_tasks:
+        file: 10-quickcourse-dependencies.yml
+      tags:
+        - quickcourse-dependency-setup
+
+    - name: Setup the quick course user and working directories
+      ansible.builtin.include_tasks:
+        file: 20-quickcourse-user-setup.yml
+      tags:
+        - quickcourse-user-setup
+
+    - name: Setup ssh config for lab accounts (if terminals enabled)
+      when: quickcourse_enable_terminals | default(false) | bool
+      ansible.builtin.include_tasks:
+        file: 22-quickcourse-users-security.yml
+      tags:
+        - quickcourse-user-security
+
+    - name: Clone quick course repo and build with npm
+      ansible.builtin.include_tasks:
+        file: 30-quickcourse-clone-and-build.yml
+      tags:
+        - quickcourse-clone-and-build
+
+    - name: Setup optional terminal services
+      when:
+        - quickcourse_enable_terminals | default(false) | bool
+        - quickcourse_tab_services | length > 0
+      ansible.builtin.include_tasks:
+        file: 32-quickcourse-optional-terminals.yml
+      tags:
+        - quickcourse-terminals
+
+    - name: Post-build customizations and rendering
+      ansible.builtin.include_tasks:
+        file: 40-quickcourse-render.yml
+      tags:
+        - quickcourse-render
+
+    - name: Create, enable, start quick course systemd service
+      ansible.builtin.include_tasks:
+        file: 50-quickcourse-service.yml
+      tags:
+        - quickcourse-services
+
+    - name: Validate quick course service and output URLs
+      ansible.builtin.include_tasks:
+        file: 60-quickcourse-verify.yml
+      tags:
+        - quickcourse-verify

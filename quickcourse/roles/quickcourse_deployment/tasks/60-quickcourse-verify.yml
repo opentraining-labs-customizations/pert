@@ -1,0 +1,18 @@
+---
+- name: Compute port suffix when non-standard port is used
+  ansible.builtin.set_fact:
+    f_port_suffix: "{% if (quickcourse_primary_port | default(443) | int) != 443 %}:{{ quickcourse_primary_port }}{% endif %}"
+
+- name: Capture lab_ui_url as fact
+  ansible.builtin.set_fact:
+    f_lab_ui_url: "https://{{ quickcourse_host }}{{ f_port_suffix | default('') }}/{{ quickcourse_primary_path }}"
+
+- name: Output quick course URLs as userinfo and userdata
+  agnosticd_user_info:
+    msg:
+      - "Your Quick Course URL: {{ f_lab_ui_url }}"
+      - "Your Quick Course Host: {{ quickcourse_host }}"
+    data:
+      lab_ui_url: "{{ f_lab_ui_url }}"
+      quickcourse_primary_view_url: "{{ f_lab_ui_url }}"
+      quickcourse_host: "{{ quickcourse_host }}"

@@ -1,0 +1,26 @@
+---
+namespace: pert
+name: quickcourse
+version: 1.0.0
+readme: README.md
+authors:
+  - Amrinder Singh
+
+description: Ansible collection for deploying Red Hat Quick Course content to bare metal and OpenShift
+
+license:
+  - GPL-2.0-or-later
+
+tags:
+  - quickcourse
+  - antora
+  - documentation
+  - openshift
+  - deployment
+
+dependencies: {}
+
+build_ignore:
+  - '*.tar.gz'
+  - .git
+  - .gitignore

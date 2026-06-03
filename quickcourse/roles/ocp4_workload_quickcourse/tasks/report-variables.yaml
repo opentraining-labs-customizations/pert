@@ -1,0 +1,27 @@
+---
+- name: Print route to look for
+  ansible.builtin.debug:
+    msg: "Looking for route {{ ocp4_workload_quickcourse_service_name }} in namespace {{ _quickcourse_namespace }}."
+
+- name: Get the Quick Course route
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ _quickcourse_kubeconfig | default(omit) }}"
+    api_version: route.openshift.io/v1
+    kind: Route
+    name: "{{ ocp4_workload_quickcourse_service_name }}"
+    namespace: "{{ _quickcourse_namespace }}"
+  register: r_quickcourse_route
+  failed_when: r_quickcourse_route.resources | default([]) | length != 1
+  until: r_quickcourse_route is successful
+  retries: 100
+  delay: 5
+
+- name: Output agnosticd_user_data for Quick Course
+  vars:
+    _quickcourse_url: "https://{{ r_quickcourse_route.resources[0].spec.host }}/"
+  agnosticd_user_info:
+    msg: "Lab instructions: {{ _quickcourse_url }}"
+    data:
+      lab_ui_url: "{{ _quickcourse_url }}"
+      quickcourse_primary_view_url: "{{ _quickcourse_url }}"
+    user: "{{ _quickcourse_user | default(omit) }}"

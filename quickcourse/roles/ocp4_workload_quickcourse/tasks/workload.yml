@@ -1,0 +1,51 @@
+---
+# Main workload deployment logic for Quick Course on OpenShift
+
+- name: Prepare Variables
+  ansible.builtin.include_tasks: prepare-variables.yaml
+
+- name: Deploy using Helm
+  when: ocp4_workload_quickcourse_deployment_type == "helm"
+  block:
+  - name: Check if Helm needs to be installed
+    ansible.builtin.include_tasks: check-and-install-helm.yaml
+
+  - name: Deploy Quick Course via Helm (single user)
+    when: not _quickcourse_user_data.users is defined
+    vars:
+      _quickcourse_namespace: "{{ ocp4_workload_quickcourse_namespace }}"
+      _quickcourse_vars: "{{ _quickcourse_user_data | combine(quickcourse_vars) | combine({'guid': guid}) }}"
+    ansible.builtin.include_tasks:
+      file: deploy-quickcourse-helm.yaml
+
+  - name: Deploy Quick Course via Helm (multi user)
+    when: _quickcourse_user_data.users is defined
+    vars:
+      _quickcourse_user: "{{ _quickcourse_users_item.key }}"
+      _quickcourse_namespace: "{{ ocp4_workload_quickcourse_namespace }}-{{ _quickcourse_user }}"
+      _quickcourse_vars: "{{ _quickcourse_users_item.value | combine(quickcourse_vars) | combine({'guid': guid, 'user': _quickcourse_user}) }}"
+    ansible.builtin.include_tasks:
+      file: deploy-quickcourse-helm.yaml
+    loop: "{{ _quickcourse_user_data.users | dict2items }}"
+    loop_control:
+      loop_var: _quickcourse_users_item
+      label: "{{ _quickcourse_users_item.key }}"
+
+- name: Report Variables to user_data (single user)
+  when: not _quickcourse_user_data.users is defined
+  vars:
+    _quickcourse_namespace: "{{ ocp4_workload_quickcourse_namespace }}"
+  ansible.builtin.include_tasks:
+    file: report-variables.yaml
+
+- name: Report Variables to user_data (multi user)
+  when: _quickcourse_user_data.users is defined
+  vars:
+    _quickcourse_user: "{{ _quickcourse_users_item.key }}"
+    _quickcourse_namespace: "{{ ocp4_workload_quickcourse_namespace }}-{{ _quickcourse_user }}"
+  ansible.builtin.include_tasks:
+    file: report-variables.yaml
+  loop: "{{ _quickcourse_user_data.users | dict2items }}"
+  loop_control:
+    loop_var: _quickcourse_users_item
+    label: "{{ _quickcourse_users_item.key }}"

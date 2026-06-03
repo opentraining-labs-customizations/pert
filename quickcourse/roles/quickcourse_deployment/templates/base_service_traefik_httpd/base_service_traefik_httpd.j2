@@ -1,0 +1,89 @@
+{% set _provider = (quickcourse_tls_provider | default('zerossl')) | lower %}
+{% if _provider == 'zerossl' %}
+{% set _caserver = quickcourse_acme_zerossl_caserver %}
+{% set _challenge = quickcourse_acme_zerossl_acme_challenge %}
+{% set _zerossl_eab_kid = quickcourse_acme_zerossl_eab_kid %}
+{% set _zerossl_eab_hmac = quickcourse_acme_zerossl_eab_hmac_key %}
+{% elif _provider == 'letsencrypt' %}
+{% set _caserver = quickcourse_acme_letsencrypt_caserver %}
+{% set _challenge = quickcourse_acme_letsencrypt_acme_challenge %}
+{% set _zerossl_eab_kid = '' %}
+{% set _zerossl_eab_hmac = '' %}
+{% else %}
+{% set _caserver = '' %}
+{% set _challenge = '' %}
+{% set _zerossl_eab_kid = '' %}
+{% set _zerossl_eab_hmac = '' %}
+{% endif %}
+
+{% set _entrypoint = 'web' if _provider == 'none' else 'websecure' %}
+
+reverse-proxy:
+  image: {{ quickcourse_reverse_proxy_image }}:{{ quickcourse_reverse_proxy_image_tag }}
+  container_name: reverse-proxy
+  hostname: reverse-proxy
+  restart: always
+  command:
+    - "--global.checknewversion=false"
+    - "--global.sendanonymoususage=false"
+    - "--providers.docker=true"
+    - "--providers.docker.exposedbydefault=false"
+    - "--log.level=info"
+    - "--accesslog=true"
+{% if _provider == 'none' %}
+    - "--entrypoints.web.address=:{{ quickcourse_http_port | default(80) }}"
+{% else %}
+    - "--entrypoints.websecure.address=:{{ quickcourse_primary_port | default(443) }}"
+{% if _challenge == 'http' %}
+    - "--entrypoints.web.address=:{{ quickcourse_http_port | default(80) }}"
+{% endif %}
+    - "--certificatesresolvers.{{ _provider }}.acme.email={{ quickcourse_acme_email }}"
+    - "--certificatesresolvers.{{ _provider }}.acme.caserver={{ _caserver }}"
+{% if _zerossl_eab_kid %}
+    - "--certificatesresolvers.{{ _provider }}.acme.eab.kid={{ _zerossl_eab_kid }}"
+{% endif %}
+{% if _zerossl_eab_hmac %}
+    - "--certificatesresolvers.{{ _provider }}.acme.eab.hmacencoded={{ _zerossl_eab_hmac }}"
+{% endif %}
+{% if _challenge == 'http' %}
+    - "--certificatesresolvers.{{ _provider }}.acme.httpchallenge=true"
+    - "--certificatesresolvers.{{ _provider }}.acme.httpchallenge.entrypoint=web"
+{% else %}
+    - "--certificatesresolvers.{{ _provider }}.acme.tlschallenge=true"
+{% endif %}
+    - "--certificatesresolvers.{{ _provider }}.acme.storage=/acme.json"
+{% endif %}
+  volumes:
+    - "/run/user/{{ quickcourse_user_uid }}/podman/podman.sock:/var/run/docker.sock:z"
+{% if _provider != 'none' %}
+    - "{{ quickcourse_user_orchestration_dir }}/acme.json:/acme.json:z"
+{% endif %}
+  ports:
+{% if _provider == 'none' %}
+    - "{{ quickcourse_http_port | default(80) }}:80"
+{% else %}
+    - "{{ quickcourse_primary_port | default(443) }}:443"
+{% if _challenge == 'http' %}
+    - "{{ quickcourse_http_port | default(80) }}:80"
+{% endif %}
+{% endif %}
+  labels:
+    - traefik.enable=false
+
+quickcourse:
+  image: {{ quickcourse_httpd_image }}:{{ quickcourse_httpd_image_tag }}
+  container_name: quickcourse
+  hostname: quickcourse
+  restart: always
+  volumes:
+    - "{{ quickcourse_user_build_dir }}:/usr/local/apache2/htdocs:z,ro"
+  labels:
+    - "traefik.enable=true"
+    - "traefik.http.services.quickcourse.loadbalancer.server.port=80"
+    - "traefik.http.routers.quickcourse.entrypoints={{ _entrypoint }}"
+{% if _provider != 'none' %}
+    - "traefik.http.routers.quickcourse.tls.certresolver={{ _provider }}"
+{% endif %}
+    - "traefik.http.routers.quickcourse.rule=Host(`{{ quickcourse_host }}`) && PathPrefix(`/{{ quickcourse_primary_path }}`)"
+    - "traefik.http.routers.quickcourse.middlewares=quickcourse-stripprefix"
+    - "traefik.http.middlewares.quickcourse-stripprefix.stripprefix.prefixes=/{{ quickcourse_primary_path }}"

@@ -1,0 +1,29 @@
+---
+- name: Set quickcourse_host if not defined
+  when: quickcourse_host is not defined
+  ansible.builtin.set_fact:
+    quickcourse_host: "{{ groups['bastions'][0] | default(inventory_hostname) | regex_replace('\\..*$') }}.{{ guid | default('') }}{{ subdomain_base_suffix | default('') }}"
+
+- name: Verify build output directory exists
+  ansible.builtin.stat:
+    path: "{{ quickcourse_user_build_dir }}"
+  register: r_build_dir
+
+- name: Assert build directory exists
+  ansible.builtin.assert:
+    that:
+      - r_build_dir.stat.exists
+      - r_build_dir.stat.isdir
+    fail_msg: "Build directory {{ quickcourse_user_build_dir }} does not exist. Build may have failed."
+
+- name: Quick course UI inject when terminals are enabled
+  when: quickcourse_enable_terminals | default(false) | bool
+  block:
+
+    - name: Insert quick course index.html wrapper for terminals
+      ansible.builtin.template:
+        src: index.html.j2
+        dest: "{{ quickcourse_user_build_dir }}/index.html"
+        owner: "{{ quickcourse_user }}"
+        group: "{{ quickcourse_user_group }}"
+        mode: "0644"

@@ -1,0 +1,48 @@
+---
+# Example playbook for deploying Quick Course to OpenShift
+#
+# Usage:
+#   ansible-playbook deploy-quickcourse-ocp.yml \
+#     -e "quickcourse_git_repo=https://github.com/RedHatQuickCourses/aap-on-openshift.git" \
+#     -e @/path/to/vars.yml
+#
+# The playbook will:
+# 1. Auto-collect all variables from extra-vars (-e) and inject them into Quick Course content
+# 2. Deploy Quick Course pod to OpenShift namespace
+# 3. Create Service and Route
+# 4. Output the Quick Course URL in quickcourse_primary_view_url
+
+- name: Deploy Quick Course to OpenShift
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    # Toggle OpenShift deployment mode
+    quickcourse_deployment_ocp: yes
+
+    # REQUIRED: Git repository - must be provided via extra-vars
+    # quickcourse_git_repo: "https://github.com/RedHatQuickCourses/your-course.git"
+    quickcourse_git_ref: main
+
+    # Auto-collect variables for injection
+    quickcourse_auto_collect_vars: true
+
+    # OpenShift namespace (uses guid if available)
+    # quickcourse_ocp_namespace: "quickcourse-{{ guid | default('default') }}"
+
+  roles:
+    - pert.quickcourse.quickcourse_deployment
+
+  post_tasks:
+    - name: Display Quick Course URL
+      debug:
+        msg: |
+          ====================================
+          Quick Course Deployment Complete!
+          ====================================
+
+          Quick Course URL: {{ quickcourse_primary_view_url }}
+
+          All variables have been injected from extra-vars
+          ====================================

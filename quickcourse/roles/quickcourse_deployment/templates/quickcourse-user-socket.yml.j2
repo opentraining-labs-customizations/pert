@@ -1,0 +1,15 @@
+---
+- name: Start user podman socket for quickcourse
+  hosts: localhost
+  become: true
+  become_user: "{{ quickcourse_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ quickcourse_user_uid }}"
+    DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ quickcourse_user_uid }}/bus"
+  tasks:
+    - name: Start podman socket
+      ansible.builtin.systemd:
+        name: podman.socket
+        state: started
+        enabled: true
+        scope: user

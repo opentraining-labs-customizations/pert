@@ -1,0 +1,23 @@
+---
+version: "3"
+
+services:
+
+{% for service in quickcourse_base_services %}
+{% macro fake_indent_op() %}
+{% include 'base_service_' + service + '/base_service_' + service + '.j2' ignore missing %}
+{% endmacro %}
+{{ fake_indent_op() | indent(2) }}
+
+{% endfor %}
+
+{% if quickcourse_enable_terminals | default(false) | bool %}
+{% for service in quickcourse_tab_services %}
+{% macro fake_indent_op() %}
+{% include 'service_' + service + '/service_' + service + '.j2' ignore missing %}
+{% endmacro %}
+{{ fake_indent_op() | indent(2) }}
+
+{% endfor %}
+{% endif %}
+...

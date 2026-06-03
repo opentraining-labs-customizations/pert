@@ -1,0 +1,38 @@
+{% set _provider = (quickcourse_tls_provider | default(certbot_cert_manager_provider, true) | default('zerossl')) | lower %}
+{% set _entrypoint = 'web' if _provider == 'none' else 'websecure' %}
+terminal-01:
+  image: {{ quickcourse_tty_image }}:{{ quickcourse_tty_image_tag }}
+  container_name: terminal-01
+  hostname: terminal-01
+{% if quickcourse_ssh_method == 'sshkey' %}
+  volumes:
+    - "{{ quickcourse_user_home_dir }}/.ssh:{{ quickcourse_user_home_dir }}/.ssh"
+{% endif %}
+  command:
+{% if quickcourse_enable_root_ssh %}
+    - "--ssh-user=root"
+{% else %}
+    - "--ssh-user={{ quickcourse_ssh_username | default(f_user_data.default_ssh_username) | default(f_user_data.ssh_username) }}"
+{% endif %}
+{% if quickcourse_ssh_method == 'sshkey' %}
+    - "--ssh-config={{ quickcourse_user_home_dir }}/.ssh/config"
+    - "--ssh-key={{ quickcourse_user_home_dir }}/.ssh/id_{{ quickcourse_ssh_key_type }}"
+    - "--ssh-auth=publickey"
+{% elif quickcourse_ssh_method == 'password' %}
+    - "--ssh-pass={{ quickcourse_ssh_password | default(f_user_data.default_ssh_password) | default(f_user_data.ssh_password) }}"
+{% endif %}
+    - "--ssh-host={{ quickcourse_ssh_host | default(f_user_data.targethost) }}"
+    - "--ssh-port={{ quickcourse_ssh_port | default(f_user_data.targetport) | default(22) }}"
+    - "--allow-iframe=true"
+  labels:
+    - "traefik.enable=true"
+    - "traefik.http.services.terminal.loadbalancer.server.port=3000"
+    - "traefik.http.routers.terminal.entrypoints={{ _entrypoint }}"
+{% if _provider != 'none' %}
+    - "traefik.http.routers.terminal.tls.certresolver={{ _provider }}"
+{% endif %}
+    - "traefik.http.routers.terminal.rule=Host(`{{ quickcourse_host }}`) && PathPrefix(`/wetty`)"
+    - "traefik.http.routers.terminal.middlewares=terminal-stripprefix"
+    - "traefik.http.routers.terminal.middlewares=testheader"
+    - "traefik.http.middlewares.terminal-stripprefix.stripprefix.prefixes=/wetty"
+    - "traefik.http.middlewares.testheader.headers.customrequestheaders.X-Content-Type-Options=false"
