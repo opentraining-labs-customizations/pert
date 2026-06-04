@@ -4,7 +4,7 @@
 # -----------------------------------------------------------------------
 
 - name: Create OpenShift namespace
-  redhat.openshift.k8s:
+  kubernetes.core.k8s:
     state: present
     definition:
       apiVersion: v1
@@ -28,7 +28,7 @@
     quickcourse_asciidoc_attributes: "{{ quickcourse_var_lines | default([]) | join('\\n') }}"
 
 - name: Create Quick Course Pod with variable injection
-  redhat.openshift.k8s:
+  kubernetes.core.k8s:
     state: present
     namespace: "{{ quickcourse_ocp_namespace }}"
     definition:
@@ -90,7 +90,7 @@
           emptyDir: {}
 
 - name: Create Service for Quick Course
-  redhat.openshift.k8s:
+  kubernetes.core.k8s:
     state: present
     namespace: "{{ quickcourse_ocp_namespace }}"
     definition:
@@ -109,7 +109,7 @@
           targetPort: 80
 
 - name: Create Route for Quick Course
-  redhat.openshift.k8s:
+  kubernetes.core.k8s:
     state: present
     namespace: "{{ quickcourse_ocp_namespace }}"
     definition:
@@ -128,7 +128,7 @@
           insecureEdgeTerminationPolicy: Redirect
 
 - name: Wait for pod to be running
-  redhat.openshift.k8s_info:
+  kubernetes.core.k8s_info:
     kind: Pod
     name: quickcourse
     namespace: "{{ quickcourse_ocp_namespace }}"
@@ -140,7 +140,7 @@
   delay: 10
 
 - name: Get Route URL
-  redhat.openshift.k8s_info:
+  kubernetes.core.k8s_info:
     kind: Route
     name: quickcourse
     namespace: "{{ quickcourse_ocp_namespace }}"

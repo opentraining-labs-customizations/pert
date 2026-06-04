@@ -18,7 +18,8 @@ tags:
   - openshift
   - deployment
 
-dependencies: {}
+dependencies:
+  kubernetes.core: ">=2.3.0"
 
 build_ignore:
   - '*.tar.gz'
