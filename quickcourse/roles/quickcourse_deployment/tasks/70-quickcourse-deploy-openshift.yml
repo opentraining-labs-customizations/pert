@@ -11,13 +11,18 @@
     fail_msg: |
       ERROR: OpenShift API credentials are required!
 
-      Please provide via extra-vars:
+      Please provide via extra-vars (command line):
         -e "openshift_api_url=https://api.cluster-xxxxx.example.com:6443"
         -e "openshift_api_key=sha256~your-token-here"
 
-      Or use variable names from your environment:
-        -e "openshift_api_server_url=https://..."
-        -e "openshift_token=sha256~..."
+      Or via YAML vars file/playbook:
+        openshift_api_url: https://api.cluster-xxxxx.example.com:6443
+        openshift_api_key: sha256~your-token-here
+
+      Alternative variable names are also supported:
+        openshift_api_server_url: https://...
+        openshift_token: sha256~...
+        openshift_cluster_admin_token: eyJhbGci...
     success_msg: "OpenShift API: {{ quickcourse_openshift_api_url }}"
 
 - name: Create OpenShift namespace
