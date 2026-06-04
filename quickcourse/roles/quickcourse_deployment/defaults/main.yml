@@ -122,9 +122,10 @@ quickcourse_var_inject: false
 #     guid: "xxxxx-1"
 quickcourse_custom_attributes: {}
 
-# Auto-collection is disabled by default
-# Provide variables via quickcourse_custom_attributes instead
-quickcourse_auto_collect_vars: false
+# Auto-collection from extra-vars (enabled by default)
+# Collects all user-defined variables from -e command line args
+# Set to false to disable and use only quickcourse_custom_attributes
+quickcourse_auto_collect_vars: true
 
 # ----------------------------------------------------------------------
 # OpenShift Deployment Configuration

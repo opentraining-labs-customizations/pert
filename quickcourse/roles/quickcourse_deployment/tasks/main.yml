@@ -24,13 +24,24 @@
 - name: Collect variables for Quick Course deployment
   when: quickcourse_deploy | default(true) | bool
   block:
-    - name: Initialize collected variables dictionary
+    - name: Auto-collect variables from extra-vars using varnames lookup
       set_fact:
         quickcourse_collected_vars: {}
+      when: quickcourse_auto_collect_vars | default(false) | bool
 
-    - name: Use custom attributes for variable injection
+    - name: Collect each variable safely
       set_fact:
-        quickcourse_collected_vars: "{{ quickcourse_custom_attributes | default({}) }}"
+        quickcourse_collected_vars: "{{ quickcourse_collected_vars | default({}) | combine({item: lookup('vars', item)}) }}"
+      loop: "{{ q('varnames', '^(?!ansible_|quickcourse_|hostvars|groups|group_names|inventory_|playbook_|omit|item|role_|__)[a-z].*') }}"
+      when:
+        - quickcourse_auto_collect_vars | default(false) | bool
+        - lookup('vars', item, default='__UNDEFINED__') != '__UNDEFINED__'
+        - lookup('vars', item) is not mapping or (lookup('vars', item) is mapping and lookup('vars', item).keys() | list | length < 100)
+      failed_when: false
+
+    - name: Use custom attributes for variable injection (takes precedence)
+      set_fact:
+        quickcourse_collected_vars: "{{ quickcourse_collected_vars | default({}) | combine(quickcourse_custom_attributes) }}"
       when: quickcourse_custom_attributes is defined and quickcourse_custom_attributes | length > 0
 
 # OpenShift Deployment
