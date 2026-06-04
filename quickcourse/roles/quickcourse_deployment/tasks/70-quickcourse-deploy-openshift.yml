@@ -3,8 +3,28 @@
 # Deploy Quick Course to OpenShift
 # -----------------------------------------------------------------------
 
+- name: Validate OpenShift credentials are provided
+  assert:
+    that:
+      - quickcourse_openshift_api_url | length > 0
+      - quickcourse_openshift_api_key | length > 0
+    fail_msg: |
+      ERROR: OpenShift API credentials are required!
+
+      Please provide via extra-vars:
+        -e "openshift_api_url=https://api.cluster-xxxxx.example.com:6443"
+        -e "openshift_api_key=sha256~your-token-here"
+
+      Or use variable names from your environment:
+        -e "openshift_api_server_url=https://..."
+        -e "openshift_token=sha256~..."
+    success_msg: "OpenShift API: {{ quickcourse_openshift_api_url }}"
+
 - name: Create OpenShift namespace
   kubernetes.core.k8s:
+    host: "{{ quickcourse_openshift_api_url }}"
+    api_key: "{{ quickcourse_openshift_api_key }}"
+    validate_certs: "{{ quickcourse_openshift_validate_certs }}"
     state: present
     definition:
       apiVersion: v1
@@ -29,6 +49,9 @@
 
 - name: Create Quick Course Pod with variable injection
   kubernetes.core.k8s:
+    host: "{{ quickcourse_openshift_api_url }}"
+    api_key: "{{ quickcourse_openshift_api_key }}"
+    validate_certs: "{{ quickcourse_openshift_validate_certs }}"
     state: present
     namespace: "{{ quickcourse_ocp_namespace }}"
     definition:
@@ -91,6 +114,9 @@
 
 - name: Create Service for Quick Course
   kubernetes.core.k8s:
+    host: "{{ quickcourse_openshift_api_url }}"
+    api_key: "{{ quickcourse_openshift_api_key }}"
+    validate_certs: "{{ quickcourse_openshift_validate_certs }}"
     state: present
     namespace: "{{ quickcourse_ocp_namespace }}"
     definition:
@@ -110,6 +136,9 @@
 
 - name: Create Route for Quick Course
   kubernetes.core.k8s:
+    host: "{{ quickcourse_openshift_api_url }}"
+    api_key: "{{ quickcourse_openshift_api_key }}"
+    validate_certs: "{{ quickcourse_openshift_validate_certs }}"
     state: present
     namespace: "{{ quickcourse_ocp_namespace }}"
     definition:
@@ -129,6 +158,9 @@
 
 - name: Wait for pod to be running
   kubernetes.core.k8s_info:
+    host: "{{ quickcourse_openshift_api_url }}"
+    api_key: "{{ quickcourse_openshift_api_key }}"
+    validate_certs: "{{ quickcourse_openshift_validate_certs }}"
     kind: Pod
     name: quickcourse
     namespace: "{{ quickcourse_ocp_namespace }}"
@@ -141,6 +173,9 @@
 
 - name: Get Route URL
   kubernetes.core.k8s_info:
+    host: "{{ quickcourse_openshift_api_url }}"
+    api_key: "{{ quickcourse_openshift_api_key }}"
+    validate_certs: "{{ quickcourse_openshift_validate_certs }}"
     kind: Route
     name: quickcourse
     namespace: "{{ quickcourse_ocp_namespace }}"
