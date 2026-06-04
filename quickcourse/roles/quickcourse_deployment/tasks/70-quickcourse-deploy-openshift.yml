@@ -47,29 +47,28 @@
           command: ["/bin/bash"]
           args:
           - -xec
-          - |
-            dnf install -y git
-            rm -rf /build/*
-            cd /build
-            git clone {{ quickcourse_git_repo }} .
+          - >-
+            dnf install -y git &&
+            rm -rf /build/* &&
+            cd /build &&
+            git clone {{ quickcourse_git_repo }} . &&
             {% if quickcourse_git_ref != 'main' %}
-            git checkout {{ quickcourse_git_ref }}
+            git checkout {{ quickcourse_git_ref }} &&
             {% endif %}
             {% if quickcourse_asciidoc_attributes | default('') | length > 0 %}
-            # Inject variables into antora-playbook.yml
-            sed -i '/^asciidoc:/,/^ui:/ {
-              /page-pagination:/a\
-{{ quickcourse_asciidoc_attributes }}
-            }' antora-playbook.yml
-            echo "=== Variables Injected ==="
-            tail -20 antora-playbook.yml
+            printf '\nasciidoc:\n  extensions:\n  - "@asciidoctor/tabs"\n  attributes:\n    page-pagination: true\n{{ quickcourse_asciidoc_attributes }}\n' >> antora-playbook.tmp &&
+            sed '/^asciidoc:/,/^ui:/d' antora-playbook.yml > antora-playbook.yml.new &&
+            cat antora-playbook.tmp antora-playbook.yml.new > antora-playbook.yml &&
+            rm antora-playbook.tmp antora-playbook.yml.new &&
+            echo "=== Variables Injected ===" &&
+            tail -20 antora-playbook.yml &&
             {% else %}
-            echo "=== No variables to inject ==="
+            echo "=== No variables to inject ===" &&
             {% endif %}
-            npm install
-            npm run build
-            cp -r build/site/* /app/
-            echo "=== Build Complete ==="
+            npm install &&
+            npm run build &&
+            cp -r build/site/* /app/ &&
+            echo "=== Build Complete ===" &&
             ls -la /app/
           volumeMounts:
           - name: app
