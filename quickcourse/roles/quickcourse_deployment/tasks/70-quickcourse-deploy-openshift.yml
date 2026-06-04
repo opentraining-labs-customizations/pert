@@ -137,13 +137,15 @@
   set_fact:
     quickcourse_primary_view_url: "https://{{ quickcourse_route_info.resources[0].spec.host }}/"
 
-- name: Display Quick Course URL
+- name: Display Quick Course deployment summary
   debug:
-    msg: "Quick Course is accessible at: {{ quickcourse_primary_view_url }}"
+    msg: |
+      ========================================
+      Quick Course Deployment Complete!
+      ========================================
 
-- name: Output Quick Course URL (if agnosticd_user_info available)
-  when: agnosticd_user_info is defined
-  agnosticd_user_info:
-    msg: "Quick Course URL: {{ quickcourse_primary_view_url }}"
-    data:
-      quickcourse_url: "{{ quickcourse_primary_view_url }}"
+      Quick Course URL: {{ quickcourse_primary_view_url }}
+      Namespace: {{ quickcourse_ocp_namespace }}
+
+      Variables injected: {{ quickcourse_collected_vars.keys() | list | length }} variables
+      ========================================
