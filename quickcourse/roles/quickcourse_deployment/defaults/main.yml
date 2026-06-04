@@ -135,9 +135,11 @@ quickcourse_auto_collect_vars: true
 # OpenShift API connection (provide via extra-vars)
 # Example: -e openshift_api_url=https://api.cluster-xxxxx.example.com:6443
 #          -e openshift_api_key=sha256~xxxxxxxxxxxx
+#          -e openshift_api_ca_cert=/path/to/ca.crt (or certificate content as string)
 quickcourse_openshift_api_url: "{{ openshift_api_url | default(openshift_api_server_url) | default('') }}"
 quickcourse_openshift_api_key: "{{ openshift_api_key | default(openshift_token) | default(openshift_cluster_admin_token) | default('') }}"
 quickcourse_openshift_validate_certs: "{{ openshift_validate_certs | default(true) }}"
+quickcourse_openshift_api_ca_cert: "{{ openshift_api_ca_cert | default(omit) }}"
 
 # OpenShift namespace for deployment
 quickcourse_ocp_namespace: "quickcourse-{{ guid | default('default') }}"
