@@ -49,7 +49,7 @@
 
 - name: Build variable injection lines when variables exist
   set_fact:
-    quickcourse_var_lines: "{{ quickcourse_var_lines | default([]) + ['    ' + item.key + ': \"' + item.value | string + '\"'] }}"
+    quickcourse_var_lines: "{{ quickcourse_var_lines | default([]) + ['    ' + item.key + ': \"' + item.value | string | replace('\"', '\\\"') + '\"'] }}"
   loop: "{{ quickcourse_collected_vars | default({}) | dict2items }}"
   when: quickcourse_collected_vars | default({}) | length > 0
 
