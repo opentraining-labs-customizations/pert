@@ -75,6 +75,32 @@
         variables.txt: "{{ quickcourse_asciidoc_attributes }}"
   when: quickcourse_asciidoc_attributes | default('') | length > 0
 
+- name: Set volume mounts for init container
+  set_fact:
+    _init_volume_mounts:
+      - name: app
+        mountPath: /app
+      - name: build
+        mountPath: /build
+
+- name: Add ConfigMap volume mount if variables exist
+  set_fact:
+    _init_volume_mounts: "{{ _init_volume_mounts + [{'name': 'quickcourse-vars', 'mountPath': '/var/quickcourse'}] }}"
+  when: quickcourse_asciidoc_attributes | default('') | length > 0
+
+- name: Set volumes list
+  set_fact:
+    _pod_volumes:
+      - name: app
+        emptyDir: {}
+      - name: build
+        emptyDir: {}
+
+- name: Add ConfigMap volume if variables exist
+  set_fact:
+    _pod_volumes: "{{ _pod_volumes + [{'name': 'quickcourse-vars', 'configMap': {'name': 'quickcourse-vars'}}] }}"
+  when: quickcourse_asciidoc_attributes | default('') | length > 0
+
 - name: Create Quick Course Pod with variable injection
   kubernetes.core.k8s:
     host: "{{ quickcourse_openshift_api_url }}"
@@ -127,15 +153,7 @@
             cp -r build/site/* /app/ &&
             echo "=== Build Complete ===" &&
             ls -la /app/
-          volumeMounts:
-          - name: app
-            mountPath: /app
-          - name: build
-            mountPath: /build
-          {% if quickcourse_asciidoc_attributes | default('') | length > 0 %}
-          - name: quickcourse-vars
-            mountPath: /var/quickcourse
-          {% endif %}
+          volumeMounts: "{{ _init_volume_mounts }}"
         containers:
         - name: nginx
           image: "{{ quickcourse_ocp_webserver_image }}"
@@ -144,16 +162,7 @@
           volumeMounts:
           - name: app
             mountPath: /usr/share/nginx/html
-        volumes:
-        - name: app
-          emptyDir: {}
-        - name: build
-          emptyDir: {}
-        {% if quickcourse_asciidoc_attributes | default('') | length > 0 %}
-        - name: quickcourse-vars
-          configMap:
-            name: quickcourse-vars
-        {% endif %}
+        volumes: "{{ _pod_volumes }}"
 
 - name: Create Service for Quick Course
   kubernetes.core.k8s:
