@@ -90,9 +90,7 @@
             git checkout {{ quickcourse_git_ref }} &&
             {% endif %}
             {% if quickcourse_asciidoc_attributes | default('') | length > 0 %}
-            cat > /tmp/vars.txt << 'EOFVARS'
-{{ quickcourse_asciidoc_attributes }}
-EOFVARS
+            printf '%s\n' '{{ quickcourse_asciidoc_attributes }}' > /tmp/vars.txt &&
             sed -i '/^  attributes:/r /tmp/vars.txt' antora-playbook.yml &&
             rm -f /tmp/vars.txt &&
             echo "=== Variables Injected ===" &&
