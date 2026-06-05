@@ -57,6 +57,24 @@
   set_fact:
     quickcourse_asciidoc_attributes: "{{ quickcourse_var_lines | default([]) | join('\n') }}"
 
+- name: Create ConfigMap for variables (to avoid argument list too long)
+  kubernetes.core.k8s:
+    host: "{{ quickcourse_openshift_api_url }}"
+    api_key: "{{ quickcourse_openshift_api_key }}"
+    validate_certs: false
+    ca_cert: "{{ quickcourse_openshift_api_ca_cert }}"
+    state: present
+    namespace: "{{ quickcourse_ocp_namespace }}"
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: quickcourse-vars
+        namespace: "{{ quickcourse_ocp_namespace }}"
+      data:
+        variables.txt: "{{ quickcourse_asciidoc_attributes }}"
+  when: quickcourse_asciidoc_attributes | default('') | length > 0
+
 - name: Create Quick Course Pod with variable injection
   kubernetes.core.k8s:
     host: "{{ quickcourse_openshift_api_url }}"
@@ -90,13 +108,17 @@
             git checkout {{ quickcourse_git_ref }} &&
             {% endif %}
             {% if quickcourse_asciidoc_attributes | default('') | length > 0 %}
-            echo '{{ quickcourse_asciidoc_attributes | b64encode }}' | base64 -d > /tmp/vars.txt &&
-            echo "" >> /tmp/vars.txt &&
-            awk '/^  attributes:$/ {print; system("cat /tmp/vars.txt"); next} 1' antora-playbook.yml > /tmp/playbook.yml &&
-            mv /tmp/playbook.yml antora-playbook.yml &&
-            rm -f /tmp/vars.txt &&
-            echo "=== Variables Injected ===" &&
-            tail -30 antora-playbook.yml &&
+            if [ -f /var/quickcourse/variables.txt ]; then
+              cp /var/quickcourse/variables.txt /tmp/vars.txt &&
+              echo "" >> /tmp/vars.txt &&
+              awk '/^  attributes:$/ {print; system("cat /tmp/vars.txt"); next} 1' antora-playbook.yml > /tmp/playbook.yml &&
+              mv /tmp/playbook.yml antora-playbook.yml &&
+              rm -f /tmp/vars.txt &&
+              echo "=== Variables Injected ===" &&
+              tail -30 antora-playbook.yml
+            else
+              echo "=== No ConfigMap found, skipping variable injection ==="
+            fi &&
             {% else %}
             echo "=== No variables to inject ===" &&
             {% endif %}
@@ -110,6 +132,10 @@
             mountPath: /app
           - name: build
             mountPath: /build
+          {% if quickcourse_asciidoc_attributes | default('') | length > 0 %}
+          - name: quickcourse-vars
+            mountPath: /var/quickcourse
+          {% endif %}
         containers:
         - name: nginx
           image: "{{ quickcourse_ocp_webserver_image }}"
@@ -123,6 +149,11 @@
           emptyDir: {}
         - name: build
           emptyDir: {}
+        {% if quickcourse_asciidoc_attributes | default('') | length > 0 %}
+        - name: quickcourse-vars
+          configMap:
+            name: quickcourse-vars
+        {% endif %}
 
 - name: Create Service for Quick Course
   kubernetes.core.k8s:
