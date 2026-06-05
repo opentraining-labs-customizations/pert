@@ -91,10 +91,12 @@
             {% endif %}
             {% if quickcourse_asciidoc_attributes | default('') | length > 0 %}
             echo '{{ quickcourse_asciidoc_attributes | b64encode }}' | base64 -d > /tmp/vars.txt &&
-            sed -i '/^  attributes:/r /tmp/vars.txt' antora-playbook.yml &&
+            echo "" >> /tmp/vars.txt &&
+            awk '/^  attributes:$/ {print; system("cat /tmp/vars.txt"); next} 1' antora-playbook.yml > /tmp/playbook.yml &&
+            mv /tmp/playbook.yml antora-playbook.yml &&
             rm -f /tmp/vars.txt &&
             echo "=== Variables Injected ===" &&
-            tail -20 antora-playbook.yml &&
+            tail -30 antora-playbook.yml &&
             {% else %}
             echo "=== No variables to inject ===" &&
             {% endif %}
