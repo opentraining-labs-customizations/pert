@@ -83,17 +83,14 @@
           - -xec
           - >-
             dnf install -y git &&
-            rm -rf /build/* &&
+            rm -rf /build/* /build/.* 2>/dev/null || true &&
             cd /build &&
             git clone {{ quickcourse_git_repo }} . &&
             {% if quickcourse_git_ref != 'main' %}
             git checkout {{ quickcourse_git_ref }} &&
             {% endif %}
             {% if quickcourse_asciidoc_attributes | default('') | length > 0 %}
-            printf '\nasciidoc:\n  extensions:\n  - "@asciidoctor/tabs"\n  attributes:\n    page-pagination: true\n{{ quickcourse_asciidoc_attributes }}\n' >> antora-playbook.tmp &&
-            sed '/^asciidoc:/,/^ui:/d' antora-playbook.yml > antora-playbook.yml.new &&
-            cat antora-playbook.tmp antora-playbook.yml.new > antora-playbook.yml &&
-            rm antora-playbook.tmp antora-playbook.yml.new &&
+            sed -i '/^  attributes:/a\{{ quickcourse_asciidoc_attributes }}' antora-playbook.yml &&
             echo "=== Variables Injected ===" &&
             tail -20 antora-playbook.yml &&
             {% else %}
