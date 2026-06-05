@@ -33,7 +33,7 @@
   kubernetes.core.k8s:
     host: "{{ quickcourse_openshift_api_url }}"
     api_key: "{{ quickcourse_openshift_api_key }}"
-    validate_certs: "{{ quickcourse_openshift_validate_certs }}"
+    validate_certs: false
     ca_cert: "{{ quickcourse_openshift_api_ca_cert }}"
     state: present
     definition:
@@ -61,7 +61,7 @@
   kubernetes.core.k8s:
     host: "{{ quickcourse_openshift_api_url }}"
     api_key: "{{ quickcourse_openshift_api_key }}"
-    validate_certs: "{{ quickcourse_openshift_validate_certs }}"
+    validate_certs: false
     ca_cert: "{{ quickcourse_openshift_api_ca_cert }}"
     state: present
     namespace: "{{ quickcourse_ocp_namespace }}"
@@ -127,7 +127,7 @@
   kubernetes.core.k8s:
     host: "{{ quickcourse_openshift_api_url }}"
     api_key: "{{ quickcourse_openshift_api_key }}"
-    validate_certs: "{{ quickcourse_openshift_validate_certs }}"
+    validate_certs: false
     ca_cert: "{{ quickcourse_openshift_api_ca_cert }}"
     state: present
     namespace: "{{ quickcourse_ocp_namespace }}"
@@ -150,7 +150,7 @@
   kubernetes.core.k8s:
     host: "{{ quickcourse_openshift_api_url }}"
     api_key: "{{ quickcourse_openshift_api_key }}"
-    validate_certs: "{{ quickcourse_openshift_validate_certs }}"
+    validate_certs: false
     ca_cert: "{{ quickcourse_openshift_api_ca_cert }}"
     state: present
     namespace: "{{ quickcourse_ocp_namespace }}"
@@ -173,7 +173,7 @@
   kubernetes.core.k8s_info:
     host: "{{ quickcourse_openshift_api_url }}"
     api_key: "{{ quickcourse_openshift_api_key }}"
-    validate_certs: "{{ quickcourse_openshift_validate_certs }}"
+    validate_certs: false
     ca_cert: "{{ quickcourse_openshift_api_ca_cert }}"
     kind: Pod
     name: quickcourse
@@ -189,7 +189,7 @@
   kubernetes.core.k8s_info:
     host: "{{ quickcourse_openshift_api_url }}"
     api_key: "{{ quickcourse_openshift_api_key }}"
-    validate_certs: "{{ quickcourse_openshift_validate_certs }}"
+    validate_certs: false
     ca_cert: "{{ quickcourse_openshift_api_ca_cert }}"
     kind: Route
     name: quickcourse
