@@ -32,11 +32,12 @@
     - name: Collect each variable safely
       set_fact:
         quickcourse_collected_vars: "{{ quickcourse_collected_vars | default({}) | combine({item: lookup('vars', item)}) }}"
-      loop: "{{ q('varnames', '^(?!ansible_|quickcourse_|hostvars|groups|group_names|inventory_|playbook_|omit|item|role_|__)[a-z].*') }}"
+      loop: "{{ q('varnames', '^(?!ansible_|quickcourse_|hostvars|groups|group_names|inventory_|playbook_|omit|item|role_|play_hosts|play_batch|__)[a-z].*') }}"
       when:
         - quickcourse_auto_collect_vars | default(false) | bool
         - lookup('vars', item, default='__UNDEFINED__') != '__UNDEFINED__'
         - lookup('vars', item) is not mapping or (lookup('vars', item) is mapping and lookup('vars', item).keys() | list | length < 100)
+        - item not in quickcourse_auto_collect_exclude | default([])
       failed_when: false
 
     - name: Use custom attributes for variable injection (takes precedence)

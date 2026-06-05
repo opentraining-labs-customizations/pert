@@ -167,6 +167,12 @@ quickcourse_auto_collect_exclude:
   - "omit"
   - "discovered_interpreter_python"
   - "module_setup"
+  - "play_hosts"
+  - "play_batch"
+  - "ansible_play_hosts"
+  - "ansible_play_batch"
+  - "environment"
+  - "vars"
 
 # ----------------------------------------------------------------------
 # Systemd Service Templates
