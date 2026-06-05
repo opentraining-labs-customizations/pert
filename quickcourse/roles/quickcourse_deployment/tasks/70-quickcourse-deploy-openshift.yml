@@ -55,7 +55,7 @@
 
 - name: Join variable lines
   set_fact:
-    quickcourse_asciidoc_attributes: "{{ quickcourse_var_lines | default([]) | join('\\n') }}"
+    quickcourse_asciidoc_attributes: "{{ quickcourse_var_lines | default([]) | join('\n') }}"
 
 - name: Create Quick Course Pod with variable injection
   kubernetes.core.k8s:
