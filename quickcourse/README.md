@@ -40,9 +40,14 @@ collections:
 
 ### OpenShift Deployment
 
-Deploy Quick Course to OpenShift with automatic variable injection:
+Deploy Quick Course to OpenShift with automatic variable injection and auto-discovery:
 
 ```bash
+# Minimal deployment - auto-discovers variables from cluster
+ansible-playbook pert.quickcourse.deploy-quickcourse-ocp \
+  -e "quickcourse_git_repo=https://github.com/RedHatQuickCourses/aap-on-openshift.git"
+
+# Or with explicit variables file
 ansible-playbook pert.quickcourse.deploy-quickcourse-ocp \
   -e "quickcourse_git_repo=https://github.com/RedHatQuickCourses/aap-on-openshift.git" \
   -e @/path/to/variables.yml
@@ -52,6 +57,17 @@ ansible-playbook pert.quickcourse.deploy-quickcourse-ocp \
 
 **Required Variables:**
 - `quickcourse_git_repo`: URL of the Quick Course repository
+
+**Auto-Discovered Variables** (when logged into OpenShift with `oc`):
+- `openshift_cluster_ingress_domain`
+- `openshift_api_url`
+- `openshift_cluster_console_url`
+- `guid`
+- `gitea_console_url`
+- `gitea_admin_username`
+- `gitea_admin_password`
+- `aap_controller_web_url`
+- `aap_controller_admin_password`
 
 **Example Variables File** (`variables.yml`):
 ```yaml
@@ -117,11 +133,12 @@ ansible-playbook your-playbook.yml \
 
 ## How Variable Injection Works
 
-1. **Auto-Collection**: All variables from extra-vars and playbook vars are automatically collected
-2. **Filtering**: System variables (ansible_*, quickcourse_*, etc.) are excluded
-3. **Alias Resolution**: Variable aliases are resolved (optional - see below)
-4. **Injection**: Variables are injected into `antora-playbook.yml` under `asciidoc.attributes`
-5. **Usage in Content**: Variables are available in AsciiDoc as `{variable_name}`
+1. **Auto-Discovery** (OpenShift only): Missing variables are auto-discovered from the cluster using `oc` commands
+2. **Auto-Collection**: All variables from extra-vars and playbook vars are automatically collected
+3. **Filtering**: System variables (ansible_*, quickcourse_*, etc.) are excluded
+4. **Alias Resolution**: Variable aliases are resolved (optional - see below)
+5. **Injection**: Variables are injected into `antora-playbook.yml` under `asciidoc.attributes`
+6. **Usage in Content**: Variables are available in AsciiDoc as `{variable_name}`
 
 Example in Quick Course content:
 ```asciidoc

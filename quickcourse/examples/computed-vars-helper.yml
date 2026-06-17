@@ -1,0 +1,63 @@
+---
+# Computed Variables Helper
+#
+# This file provides computed/derived variables that may not be explicitly
+# defined in AgnosticD output but can be constructed from existing variables.
+#
+# Use this when deploying QuickCourse and missing variables like:
+# - gitea_console_url
+# - gitea_user
+# - gitea_password
+# - gitea_admin_username
+# - gitea_admin_password
+#
+# Include AFTER loading your environment vars.yaml:
+#   -e @vars.yaml -e @computed-vars-helper.yml
+
+# ============================================================
+# Gitea Variables
+# ============================================================
+
+# Gitea Console URL (constructed from hostname + ingress domain)
+gitea_console_url: "https://{{ ocp4_workload_gitea_operator_gitea_hostname | default('gitea') }}.{{ openshift_cluster_ingress_domain }}"
+
+# Gitea Admin User
+gitea_admin_username: "{{ ocp4_workload_gitea_operator_admin_user | default('opentlc-mgr') }}"
+
+# Gitea Admin Password (references common_admin_password)
+gitea_admin_password: "{{ common_admin_password }}"
+
+# Gitea Regular User (computed from user_base + number)
+# Default format: user1, user2, etc.
+gitea_user: "{{ ocp4_workload_authentication_htpasswd_user_base | default('user') }}{{ num_users | default(1) }}"
+
+# Gitea Regular User Password (references common_user_password)
+gitea_password: "{{ common_user_password }}"
+
+# ============================================================
+# AAP Controller Variables (if using agnosticd_user_data lookup)
+# ============================================================
+
+# These use agnosticd_user_data lookup which may not be available in all contexts
+# Uncomment and use if you have agnosticd_user_data available:
+
+# aap_controller_web_url: "{{ lookup('agnosticd.core.agnosticd_user_data', 'aap_controller_web_url') }}"
+# aap_controller_admin_password: "{{ lookup('agnosticd.core.agnosticd_user_data', 'aap_controller_admin_password') }}"
+
+# ============================================================
+# OpenShift Console URL (if missing)
+# ============================================================
+
+# OpenShift Console (usually available, but can be computed if needed)
+# openshift_console_url: "https://console-openshift-console.{{ openshift_cluster_ingress_domain }}"
+
+# ============================================================
+# SSH Variables (if using bastion)
+# ============================================================
+
+# SSH command string
+ssh_command: "ssh {{ bastion_ansible_user }}@{{ bastion_ansible_host }} -p {{ bastion_ansible_port }}"
+ssh_password: "{{ bastion_ansible_ssh_pass }}"
+ssh_username: "{{ bastion_ansible_user }}"
+ssh_address: "{{ bastion_ansible_host }}"
+ssh_port: "{{ bastion_ansible_port }}"

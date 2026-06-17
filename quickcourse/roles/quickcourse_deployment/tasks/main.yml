@@ -1,4 +1,14 @@
 ---
+# Auto-discover variables from OpenShift cluster
+- name: Auto-discover missing variables from cluster
+  ansible.builtin.include_tasks:
+    file: 05-auto-discover-variables.yml
+  when:
+    - quickcourse_deploy | default(true) | bool
+    - quickcourse_deployment_ocp | default('no') in ['yes', 'true', true, 'Yes', 'YES']
+  tags:
+    - quickcourse-auto-discover
+
 # Validate required parameters
 - name: Validate required parameters
   when: quickcourse_deploy | default(true) | bool

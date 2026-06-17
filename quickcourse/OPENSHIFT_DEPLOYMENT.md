@@ -49,9 +49,25 @@ pip install kubernetes
 oc login --server=https://api.cluster-xxxxx.example.com:6443 --token=YOUR-TOKEN
 ```
 
-### 2. Prepare Variables File
+### 2. Deploy with Auto-Discovery (Recommended)
 
-Create `ocp-vars.yml` with your environment variables:
+The role automatically discovers most variables from the cluster using `oc` commands:
+
+```bash
+# Minimal deployment - auto-discovers all cluster variables
+ansible-playbook pert.quickcourse.deploy-quickcourse-ocp \
+  -e "quickcourse_git_repo=https://github.com/RedHatQuickCourses/aap-on-openshift.git"
+```
+
+**Auto-Discovered Variables:**
+- OpenShift ingress domain, API URL, console URL
+- GUID (from namespace or cluster name)
+- Gitea console URL, admin username, admin password
+- AAP Controller URL and admin password
+
+### 3. (Optional) Prepare Variables File
+
+If you need to override auto-discovered values or add custom variables, create `ocp-vars.yml`:
 
 ```yaml
 ---
@@ -83,15 +99,20 @@ guid: "xxxxx-1"
 # Add any other custom variables you want injected
 ```
 
-### 3. Deploy to OpenShift
+### 4. Deploy to OpenShift
 
 ```bash
+# With auto-discovery (recommended)
+ansible-playbook pert.quickcourse.deploy-quickcourse-ocp \
+  -e "quickcourse_git_repo=https://github.com/RedHatQuickCourses/aap-on-openshift.git"
+
+# Or with custom variables file
 ansible-playbook pert.quickcourse.deploy-quickcourse-ocp \
   -e "quickcourse_git_repo=https://github.com/RedHatQuickCourses/aap-on-openshift.git" \
   -e @ocp-vars.yml
 ```
 
-### 4. Access Quick Course
+### 5. Access Quick Course
 
 The playbook will output the URL:
 
@@ -121,6 +142,7 @@ Quick Course URL: https://quickcourse-quickcourse-xxxxx-1.apps.cluster-xxxxx.exa
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
+| `quickcourse_auto_discover_vars` | No | `true` | Automatically discover missing variables from OpenShift cluster using `oc` commands |
 | `quickcourse_auto_collect_vars` | No | `true` | Automatically collect all extra-vars for injection |
 | `quickcourse_custom_attributes` | No | `{}` | Dictionary of additional variables to inject |
 | `quickcourse_variable_aliases` | No | `{}` | Map multiple source variable names to single target names (see below) |
@@ -135,12 +157,16 @@ Quick Course URL: https://quickcourse-quickcourse-xxxxx-1.apps.cluster-xxxxx.exa
 
 ### How It Works
 
-1. **Auto-Collection**: All variables from `-e` extra-vars and playbook vars are collected
-2. **Filtering**: System variables are excluded (ansible_*, quickcourse_*, hostvars, groups, etc.)
-3. **Alias Resolution**: Variable aliases are resolved (optional - maps multiple names to one target)
-4. **Injection**: Variables are injected into `antora-playbook.yml` under `asciidoc.attributes`
-5. **Build**: npm build runs with injected variables
-6. **Usage**: Variables available in AsciiDoc content as `{variable_name}`
+1. **Auto-Discovery**: Missing variables are discovered from OpenShift cluster using `oc` commands (if logged in)
+   - Discovers: ingress domain, API URL, console URL, GUID, Gitea URL/credentials, AAP URL/password
+   - Non-blocking: deployment continues if discovery fails
+   - Only discovers variables that are not already defined
+2. **Auto-Collection**: All variables from `-e` extra-vars and playbook vars are collected
+3. **Filtering**: System variables are excluded (ansible_*, quickcourse_*, hostvars, groups, etc.)
+4. **Alias Resolution**: Variable aliases are resolved (optional - maps multiple names to one target)
+5. **Injection**: Variables are injected into `antora-playbook.yml` under `asciidoc.attributes`
+6. **Build**: npm build runs with injected variables
+7. **Usage**: Variables available in AsciiDoc content as `{variable_name}`
 
 ### Example
 

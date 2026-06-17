@@ -3,7 +3,12 @@
 # Deploy Quick Course to OpenShift
 # -----------------------------------------------------------------------
 
+- name: Set become to false for all OpenShift tasks
+  set_fact:
+    ansible_become: false
+
 - name: Validate OpenShift credentials are provided
+  become: false
   assert:
     that:
       - quickcourse_openshift_api_url | length > 0

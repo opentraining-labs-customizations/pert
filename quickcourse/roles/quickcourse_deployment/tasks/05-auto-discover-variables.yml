@@ -1,0 +1,10 @@
+---
+# Auto-discovery placeholder (disabled for now due to sudo issues)
+# Variables should be provided via vars.yaml or extra-vars
+
+- name: Auto-discovery disabled
+  debug:
+    msg: "Auto-discovery is disabled. Using variables from vars.yaml and extra-vars."
+  when:
+    - quickcourse_deployment_ocp | default('no') in ['yes', 'true', true, 'Yes', 'YES']
+    - quickcourse_auto_discover_vars | default(false) | bool

@@ -127,6 +127,12 @@ quickcourse_custom_attributes: {}
 # Set to false to disable and use only quickcourse_custom_attributes
 quickcourse_auto_collect_vars: true
 
+# Auto-discovery from OpenShift cluster (enabled by default for OCP deployments)
+# Automatically discovers missing variables from the cluster using oc commands
+# Discovers: ingress domain, API URL, console URL, Gitea URL, AAP URL, GUID, passwords
+# Set to false to disable auto-discovery and require all variables to be provided
+quickcourse_auto_discover_vars: true
+
 # Variable aliases for content injection
 # Maps multiple source variable names to a single target variable name in the content
 # The first found source variable (in list order) will be used as the value
