@@ -136,15 +136,54 @@ quickcourse_auto_discover_vars: true
 # Variable aliases for content injection
 # Maps multiple source variable names to a single target variable name in the content
 # The first found source variable (in list order) will be used as the value
-# Example:
-#   quickcourse_variable_aliases:
-#     openshift_console_url:                    # Target variable name in content: {openshift_console_url}
-#       - openshift_cluster_console_url          # Try this variable first
-#       - ocp_console_url                        # Then this one
-#     controller_url:                            # Target variable name in content: {controller_url}
-#       - aap_controller_web_url                 # Try this variable first
-#       - tower_url                              # Then this one
-quickcourse_variable_aliases: {}
+# Non-blocking: if no source variables are found, the target is simply not injected
+#
+# Default aliases handle common AgnosticD workload variable names
+# Override or extend this in your playbook as needed
+quickcourse_variable_aliases:
+  # Gitea variables (optional - won't fail if missing)
+  gitea_console_url:
+    - gitea_console_url
+    - gitea_url
+
+  gitea_admin_username:
+    - gitea_admin_username
+    - ocp4_workload_gitea_operator_admin_user
+    - gitea_admin_user
+
+  gitea_admin_password:
+    - gitea_admin_password
+    - ocp4_workload_gitea_operator_admin_password
+
+  gitea_user:
+    - gitea_user
+    - ocp4_workload_gitea_operator_generate_user_format
+    - gitea_username
+
+  gitea_password:
+    - gitea_password
+    - ocp4_workload_gitea_operator_user_password
+    - gitea_user_password
+
+  # AAP/Controller variables (optional)
+  aap_controller_web_url:
+    - aap_controller_web_url
+    - controller_url
+    - tower_url
+
+  aap_controller_admin_password:
+    - aap_controller_admin_password
+    - controller_admin_password
+
+  # OpenShift Console (optional)
+  openshift_console_url:
+    - openshift_console_url
+    - openshift_cluster_console_url
+
+  # SSH/Bastion (optional)
+  ssh_command:
+    - ssh_command
+    - bastion_ssh_command
 
 # ----------------------------------------------------------------------
 # OpenShift Deployment Configuration

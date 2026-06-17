@@ -61,29 +61,34 @@
         - quickcourse_variable_aliases | length > 0
       ignore_errors: true
       block:
-        - name: Process each alias mapping
+        - name: Build alias-resolved variables dictionary
           set_fact:
-            quickcourse_collected_vars: "{{ quickcourse_collected_vars | default({}) | combine({item.key: __resolved_value}) }}"
-          loop: "{{ quickcourse_variable_aliases | dict2items }}"
-          when:
-            - item.value is iterable
-            - item.value is not string
-            - __resolved_value != '__NOT_FOUND__'
-          vars:
-            __resolved_value: >-
-              {%- set result = '__NOT_FOUND__' -%}
-              {%- for source_var in item.value -%}
-                {%- if source_var in vars and result == '__NOT_FOUND__' -%}
-                  {%- set result = lookup('vars', source_var) -%}
-                {%- endif -%}
+            quickcourse_alias_resolved: >-
+              {%- set resolved = {} -%}
+              {%- set collected = quickcourse_collected_vars | default({}) -%}
+              {%- for alias_key, source_list in quickcourse_variable_aliases.items() -%}
+                {%- set found = false -%}
+                {%- for source_var in source_list -%}
+                  {%- if not found and source_var in collected -%}
+                    {%- set _ = resolved.update({alias_key: collected[source_var]}) -%}
+                    {%- set found = true -%}
+                  {%- endif -%}
+                {%- endfor -%}
               {%- endfor -%}
-              {{ result }}
+              {{ resolved }}
+          failed_when: false
+          ignore_errors: true
+
+        - name: Merge alias-resolved variables into collected vars
+          set_fact:
+            quickcourse_collected_vars: "{{ quickcourse_collected_vars | default({}) | combine(quickcourse_alias_resolved | default({})) }}"
+          when: quickcourse_alias_resolved is defined
           failed_when: false
           ignore_errors: true
 
         - name: Debug alias resolution (optional)
           debug:
-            msg: "Variable alias resolution completed. Resolved {{ quickcourse_variable_aliases | dict2items | length }} alias mappings."
+            msg: "Variable alias resolution completed. Resolved {{ quickcourse_alias_resolved | default({}) | length }} variables."
             verbosity: 1
           failed_when: false
           ignore_errors: true
