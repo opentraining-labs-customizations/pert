@@ -45,6 +45,39 @@
         quickcourse_collected_vars: "{{ quickcourse_collected_vars | default({}) | combine(quickcourse_custom_attributes) }}"
       when: quickcourse_custom_attributes is defined and quickcourse_custom_attributes | length > 0
 
+    - name: Resolve variable aliases (non-blocking)
+      when:
+        - quickcourse_variable_aliases is defined
+        - quickcourse_variable_aliases | length > 0
+      ignore_errors: true
+      block:
+        - name: Process each alias mapping
+          set_fact:
+            quickcourse_collected_vars: "{{ quickcourse_collected_vars | default({}) | combine({item.key: __resolved_value}) }}"
+          loop: "{{ quickcourse_variable_aliases | dict2items }}"
+          when:
+            - item.value is iterable
+            - item.value is not string
+            - __resolved_value != '__NOT_FOUND__'
+          vars:
+            __resolved_value: >-
+              {%- set result = '__NOT_FOUND__' -%}
+              {%- for source_var in item.value -%}
+                {%- if source_var in vars and result == '__NOT_FOUND__' -%}
+                  {%- set result = lookup('vars', source_var) -%}
+                {%- endif -%}
+              {%- endfor -%}
+              {{ result }}
+          failed_when: false
+          ignore_errors: true
+
+        - name: Debug alias resolution (optional)
+          debug:
+            msg: "Variable alias resolution completed. Resolved {{ quickcourse_variable_aliases | dict2items | length }} alias mappings."
+            verbosity: 1
+          failed_when: false
+          ignore_errors: true
+
 # OpenShift Deployment
 - name: Deploy Quick Course to OpenShift
   when:

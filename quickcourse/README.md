@@ -18,7 +18,10 @@ Ansible collection for deploying Red Hat Quick Course content to both local syst
 ### Documentation
 
 - **[OPENSHIFT_DEPLOYMENT.md](./OPENSHIFT_DEPLOYMENT.md)**: Complete OpenShift deployment guide with all OCP-specific variables and troubleshooting
+- **[VARIABLE_ALIASES.md](./VARIABLE_ALIASES.md)**: Variable aliases feature guide - map multiple source names to target variables
 - **[examples/ocp-vars-example.yml](./examples/ocp-vars-example.yml)**: Example variables file for OpenShift deployments
+- **[examples/variable-aliases-example.yml](./examples/variable-aliases-example.yml)**: Example variable alias configurations
+- **[examples/deploy-with-aliases.yml](./examples/deploy-with-aliases.yml)**: Example deployment playbook using aliases
 
 ## Installation
 
@@ -116,8 +119,9 @@ ansible-playbook your-playbook.yml \
 
 1. **Auto-Collection**: All variables from extra-vars and playbook vars are automatically collected
 2. **Filtering**: System variables (ansible_*, quickcourse_*, etc.) are excluded
-3. **Injection**: Variables are injected into `antora-playbook.yml` under `asciidoc.attributes`
-4. **Usage in Content**: Variables are available in AsciiDoc as `{variable_name}`
+3. **Alias Resolution**: Variable aliases are resolved (optional - see below)
+4. **Injection**: Variables are injected into `antora-playbook.yml` under `asciidoc.attributes`
+5. **Usage in Content**: Variables are available in AsciiDoc as `{variable_name}`
 
 Example in Quick Course content:
 ```asciidoc
@@ -126,6 +130,36 @@ Access the AAP Controller at {aap_controller_web_url}
 Your OpenShift cluster domain is {openshift_cluster_ingress_domain}
 
 SSH to bastion: {ssh_command}
+```
+
+### Variable Aliases (Optional)
+
+Map multiple source variable names to a single target variable in your content. This is useful when:
+- Different environments use different variable naming conventions
+- You want to standardize variable names in your content
+- You're migrating from old variable names to new ones
+
+**Example:**
+```yaml
+quickcourse_variable_aliases:
+  # Content uses {controller_url}, but accepts multiple source names
+  controller_url:
+    - aap_controller_web_url    # Try this first
+    - tower_url                  # Then this
+    - automation_controller_url  # Finally this
+  
+  openshift_console_url:
+    - openshift_cluster_console_url
+    - ocp_console_url
+```
+
+The role searches each source variable in order and uses the first one found. See **[examples/variable-aliases-example.yml](./examples/variable-aliases-example.yml)** for more examples.
+
+**Usage:**
+```bash
+ansible-playbook deploy.yml \
+  -e @examples/variable-aliases-example.yml \
+  -e @your-vars.yml
 ```
 
 ## Example Playbook

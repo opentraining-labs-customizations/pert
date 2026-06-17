@@ -1,0 +1,80 @@
+---
+# Variable Aliases Example
+#
+# Use this to map multiple source variable names to a single target variable
+# that will be injected into your Quick Course content.
+#
+# The role will search for each source variable in order and use the first one found.
+
+quickcourse_variable_aliases:
+
+  # OpenShift Console URL
+  # Content uses: {openshift_console_url}
+  # Accepts from: openshift_cluster_console_url, ocp_console_url, or console_url
+  openshift_console_url:
+    - openshift_cluster_console_url
+    - ocp_console_url
+    - console_url
+
+  # OpenShift API URL
+  # Content uses: {openshift_api_url}
+  # Accepts from: openshift_api_server_url, ocp_api_url, or api_url
+  openshift_api_url:
+    - openshift_api_server_url
+    - ocp_api_url
+    - api_url
+
+  # AAP Controller URL
+  # Content uses: {controller_url}
+  # Accepts from: aap_controller_web_url, tower_url, or automation_controller_url
+  controller_url:
+    - aap_controller_web_url
+    - tower_url
+    - automation_controller_url
+
+  # AAP Controller Admin User
+  # Content uses: {controller_admin_user}
+  # Accepts from: aap_controller_admin_user, tower_admin_user, or admin_user
+  controller_admin_user:
+    - aap_controller_admin_user
+    - tower_admin_user
+    - admin_user
+
+  # AAP Controller Admin Password
+  # Content uses: {controller_admin_password}
+  # Accepts from: aap_controller_admin_password, tower_admin_password, or admin_password
+  controller_admin_password:
+    - aap_controller_admin_password
+    - tower_admin_password
+    - admin_password
+
+  # Gitea Console URL
+  # Content uses: {git_console_url}
+  # Accepts from: gitea_console_url, gitea_url, or git_url
+  git_console_url:
+    - gitea_console_url
+    - gitea_url
+    - git_url
+
+  # SSH Connection String
+  # Content uses: {ssh_connection}
+  # Accepts from: ssh_command, bastion_ssh, or ssh_string
+  ssh_connection:
+    - ssh_command
+    - bastion_ssh
+    - ssh_string
+
+# Usage Example:
+#
+# If your playbook has these variables:
+#   aap_controller_web_url: "https://controller.example.com"
+#   openshift_cluster_console_url: "https://console.example.com"
+#   ssh_command: "ssh user@bastion.example.com"
+#
+# And you use the aliases above, your Quick Course content can reference:
+#   {controller_url} -> resolves to aap_controller_web_url value
+#   {openshift_console_url} -> resolves to openshift_cluster_console_url value
+#   {ssh_connection} -> resolves to ssh_command value
+#
+# To use in your playbook:
+#   ansible-playbook deploy.yml -e @variable-aliases-example.yml -e @your-vars.yml

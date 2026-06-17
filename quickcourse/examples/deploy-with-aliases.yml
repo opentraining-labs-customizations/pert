@@ -1,0 +1,80 @@
+---
+# Example: Deploy Quick Course to OpenShift with Variable Aliases
+#
+# This example shows how to use variable aliases to standardize variable names
+# in your Quick Course content while accepting different source variable names.
+#
+# Usage:
+#   ansible-playbook examples/deploy-with-aliases.yml \
+#     -e "quickcourse_git_repo=https://github.com/RedHatQuickCourses/aap-on-openshift.git" \
+#     -e @your-environment-vars.yml
+
+- name: Deploy Quick Course to OpenShift with Variable Aliases
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    quickcourse_deployment_ocp: yes
+    quickcourse_git_ref: main
+    quickcourse_auto_collect_vars: true
+
+    # Define variable aliases
+    # Maps multiple possible source names to standardized target names
+    quickcourse_variable_aliases:
+      # AAP Controller
+      controller_url:
+        - aap_controller_web_url
+        - tower_url
+        - automation_controller_url
+
+      controller_admin_user:
+        - aap_controller_admin_user
+        - tower_admin_user
+        - admin_user
+
+      controller_admin_password:
+        - aap_controller_admin_password
+        - tower_admin_password
+        - admin_password
+
+      # OpenShift
+      openshift_console_url:
+        - openshift_cluster_console_url
+        - ocp_console_url
+        - console_url
+
+      openshift_api_url:
+        - openshift_api_server_url
+        - ocp_api_url
+        - api_url
+
+      # Gitea
+      git_console_url:
+        - gitea_console_url
+        - gitea_url
+        - git_url
+
+      git_admin_user:
+        - gitea_admin_username
+        - git_admin_username
+        - gitea_user
+
+      git_admin_password:
+        - gitea_admin_password
+        - git_admin_password
+        - gitea_password
+
+      # SSH/Bastion
+      ssh_connection:
+        - ssh_command
+        - bastion_ssh
+        - ssh_string
+
+  roles:
+    - pert.quickcourse.quickcourse_deployment
+
+  post_tasks:
+    - name: Display Quick Course URL
+      debug:
+        msg: "Quick Course is accessible at: {{ quickcourse_primary_view_url }}"

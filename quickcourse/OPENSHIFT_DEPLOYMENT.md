@@ -123,6 +123,7 @@ Quick Course URL: https://quickcourse-quickcourse-xxxxx-1.apps.cluster-xxxxx.exa
 |----------|----------|---------|-------------|
 | `quickcourse_auto_collect_vars` | No | `true` | Automatically collect all extra-vars for injection |
 | `quickcourse_custom_attributes` | No | `{}` | Dictionary of additional variables to inject |
+| `quickcourse_variable_aliases` | No | `{}` | Map multiple source variable names to single target names (see below) |
 
 ### Output Variables
 
@@ -136,9 +137,10 @@ Quick Course URL: https://quickcourse-quickcourse-xxxxx-1.apps.cluster-xxxxx.exa
 
 1. **Auto-Collection**: All variables from `-e` extra-vars and playbook vars are collected
 2. **Filtering**: System variables are excluded (ansible_*, quickcourse_*, hostvars, groups, etc.)
-3. **Injection**: Variables are injected into `antora-playbook.yml` under `asciidoc.attributes`
-4. **Build**: npm build runs with injected variables
-5. **Usage**: Variables available in AsciiDoc content as `{variable_name}`
+3. **Alias Resolution**: Variable aliases are resolved (optional - maps multiple names to one target)
+4. **Injection**: Variables are injected into `antora-playbook.yml` under `asciidoc.attributes`
+5. **Build**: npm build runs with injected variables
+6. **Usage**: Variables available in AsciiDoc content as `{variable_name}`
 
 ### Example
 
@@ -206,6 +208,45 @@ windows_password: ""
 # Custom variables
 # Add any other variables needed by your Quick Course content
 ```
+
+### Variable Aliases (Advanced)
+
+Variable aliases allow you to map multiple source variable names to a single target variable name in your content. This is useful when:
+- Different environments use different naming conventions
+- You want to standardize variable names across courses
+- You're migrating from old variable names to new ones
+
+**Example configuration:**
+```yaml
+quickcourse_variable_aliases:
+  # Content uses {controller_url}, accepts multiple sources
+  controller_url:
+    - aap_controller_web_url    # Try this first
+    - tower_url                  # Then this
+    - automation_controller_url  # Finally this
+  
+  openshift_console_url:
+    - openshift_cluster_console_url
+    - ocp_console_url
+    - console_url
+```
+
+**How it works:**
+1. The role searches for each source variable in order (top to bottom)
+2. The first found source variable's value is used
+3. The value is injected as the target variable name
+4. If none are found, the target variable is not injected (non-blocking)
+
+**Example usage:**
+```bash
+# Use pre-defined aliases with your variables
+ansible-playbook pert.quickcourse.deploy-quickcourse-ocp \
+  -e "quickcourse_git_repo=https://github.com/..." \
+  -e @examples/variable-aliases-example.yml \
+  -e @your-ocp-vars.yml
+```
+
+See **[examples/variable-aliases-example.yml](./examples/variable-aliases-example.yml)** for complete examples.
 
 ## Deployment Process
 

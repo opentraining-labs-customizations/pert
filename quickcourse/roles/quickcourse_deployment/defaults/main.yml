@@ -127,6 +127,19 @@ quickcourse_custom_attributes: {}
 # Set to false to disable and use only quickcourse_custom_attributes
 quickcourse_auto_collect_vars: true
 
+# Variable aliases for content injection
+# Maps multiple source variable names to a single target variable name in the content
+# The first found source variable (in list order) will be used as the value
+# Example:
+#   quickcourse_variable_aliases:
+#     openshift_console_url:                    # Target variable name in content: {openshift_console_url}
+#       - openshift_cluster_console_url          # Try this variable first
+#       - ocp_console_url                        # Then this one
+#     controller_url:                            # Target variable name in content: {controller_url}
+#       - aap_controller_web_url                 # Try this variable first
+#       - tower_url                              # Then this one
+quickcourse_variable_aliases: {}
+
 # ----------------------------------------------------------------------
 # OpenShift Deployment Configuration
 # ----------------------------------------------------------------------
