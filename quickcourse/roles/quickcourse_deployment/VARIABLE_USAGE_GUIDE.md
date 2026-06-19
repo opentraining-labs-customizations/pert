@@ -49,8 +49,8 @@ When you enable `quickcourse_auto_collect_vars: true`, the role automatically co
 ```bash
 ansible-playbook deploy.yml \
   --extra-vars "bastion_public_hostname=bastion.example.com" \
-  --extra-vars "ssh_username=labuser" \
-  --extra-vars "ssh_password=secret123"
+  --extra-vars "ssh_username=lab123user" \
+  --extra-vars "ssh_password=secret123123"
 ```
 
 **All extra-vars are automatically collected and injected!**

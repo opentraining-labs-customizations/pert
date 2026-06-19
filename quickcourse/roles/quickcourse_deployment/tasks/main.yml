@@ -55,6 +55,26 @@
         quickcourse_collected_vars: "{{ quickcourse_collected_vars | default({}) | combine(quickcourse_custom_attributes) }}"
       when: quickcourse_custom_attributes is defined and quickcourse_custom_attributes | length > 0
 
+    - name: Extract Gitea URL from result variable (if available)
+      when:
+        - r_gitea_route is defined
+        - r_gitea_route.resources is defined
+        - r_gitea_route.resources | length > 0
+      block:
+        - name: Set gitea_url from r_gitea_route result
+          set_fact:
+            gitea_url: "{{ r_gitea_route.resources[0].status.giteaRoute }}"
+          when: r_gitea_route.resources[0].status.giteaRoute is defined
+          failed_when: false
+          ignore_errors: true
+
+        - name: Add gitea_url to collected vars if extracted
+          set_fact:
+            quickcourse_collected_vars: "{{ quickcourse_collected_vars | default({}) | combine({'gitea_url': gitea_url}) }}"
+          when: gitea_url is defined
+          failed_when: false
+          ignore_errors: true
+
     - name: Resolve variable aliases (non-blocking)
       when:
         - quickcourse_variable_aliases is defined
