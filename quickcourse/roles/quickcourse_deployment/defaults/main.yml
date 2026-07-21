@@ -195,7 +195,7 @@ quickcourse_variable_aliases:
 #          -e openshift_api_key=sha256~xxxxxxxxxxxx
 #          -e openshift_api_ca_cert=/path/to/ca.crt (or certificate content as string)
 quickcourse_openshift_api_url: "{{ openshift_api_url | default(openshift_api_server_url) | default('') }}"
-quickcourse_openshift_api_key: "{{ openshift_api_key | default(openshift_token) | default(openshift_cluster_admin_token) | default('') }}"
+quickcourse_openshift_api_key: "{{ openshift_api_key | default(openshift_bearer_token) | default(openshift_token) | default(openshift_cluster_admin_token) | default('') }}"
 quickcourse_openshift_validate_certs: false
 quickcourse_openshift_api_ca_cert: "{{ openshift_api_ca_cert | default(omit) }}"
 
