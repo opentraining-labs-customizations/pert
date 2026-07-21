@@ -1,10 +1,48 @@
 ---
-# Auto-discovery placeholder (disabled for now due to sudo issues)
-# Variables should be provided via vars.yaml or extra-vars
+# Auto-discover OpenShift credentials from the playbook's variable scope.
+# Catches any extra-var whose name contains "openshift_api_key" or "openshift_api_url"
+# (e.g. sandbox_openshift_api_key, cluster_openshift_api_key, sandbox_openshift_api_url).
+# All tasks are non-blocking.
 
-- name: Auto-discovery disabled
-  debug:
-    msg: "Auto-discovery is disabled. Using variables from vars.yaml and extra-vars."
+- name: Auto-discover OpenShift credentials from playbook variables
   when:
     - quickcourse_deployment_ocp | default('no') in ['yes', 'true', true, 'Yes', 'YES']
-    - quickcourse_auto_discover_vars | default(false) | bool
+  block:
+    - name: Find any variable whose name contains 'openshift_api_key'
+      ansible.builtin.set_fact:
+        _discovered_key_vars: "{{ q('varnames', 'openshift_api_key') | list }}"
+      failed_when: false
+      ignore_errors: true
+
+    - name: Find any variable whose name contains 'openshift_api_url' or 'openshift_api_server'
+      ansible.builtin.set_fact:
+        _discovered_url_vars: "{{ q('varnames', 'openshift_api_url|openshift_api_server') | list }}"
+      failed_when: false
+      ignore_errors: true
+
+    - name: Set quickcourse_openshift_api_key from first matching variable
+      ansible.builtin.set_fact:
+        quickcourse_openshift_api_key: "{{ lookup('vars', _discovered_key_vars[0]) }}"
+      when:
+        - _discovered_key_vars is defined
+        - _discovered_key_vars | length > 0
+        - quickcourse_openshift_api_key | default('') | length == 0
+      failed_when: false
+      ignore_errors: true
+
+    - name: Set quickcourse_openshift_api_url from first matching variable
+      ansible.builtin.set_fact:
+        quickcourse_openshift_api_url: "{{ lookup('vars', _discovered_url_vars[0]) }}"
+      when:
+        - _discovered_url_vars is defined
+        - _discovered_url_vars | length > 0
+        - quickcourse_openshift_api_url | default('') | length == 0
+      failed_when: false
+      ignore_errors: true
+
+    - name: Debug auto-discovered credentials
+      ansible.builtin.debug:
+        msg: >-
+          Auto-discovered from '{{ _discovered_key_vars[0] | default('none') }}':
+          OpenShift API={{ quickcourse_openshift_api_url | default('(not set)') }}
+        verbosity: 1
