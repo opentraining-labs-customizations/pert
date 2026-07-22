@@ -3,7 +3,8 @@
 # Priority:
 #   1. Any extra-var whose name contains 'openshift_api_key' or 'openshift_bearer_token'
 #      (e.g. sandbox_openshift_api_key) - internal quickcourse_ vars are excluded
-#   2. oc whoami --show-token (if oc is present and logged in)
+#   2. openshift_username + openshift_password  →  k8s_auth token exchange
+#   3. oc whoami --show-token (if oc is present and logged in)
 # All tasks are non-blocking.
 
 - name: Auto-discover OpenShift credentials
@@ -49,7 +50,35 @@
       ignore_errors: true
 
     # ----------------------------------------------------------------
-    # Step 2: fall back to oc CLI if credentials are still missing
+    # Step 2: username + password → token via k8s_auth
+    # ----------------------------------------------------------------
+    - name: Authenticate with username and password to obtain token
+      when:
+        - quickcourse_openshift_api_key | default('') | length == 0
+        - openshift_username | default('') | length > 0
+        - openshift_password | default(common_password) | default('') | length > 0
+        - quickcourse_openshift_api_url | default('') | length > 0
+      block:
+        - name: Exchange credentials for token via k8s_auth
+          kubernetes.core.k8s_auth:
+            host: "{{ quickcourse_openshift_api_url }}"
+            username: "{{ openshift_username }}"
+            password: "{{ openshift_password | default(common_password) }}"
+            validate_certs: "{{ quickcourse_openshift_validate_certs | default(false) }}"
+          register: _k8s_auth_result
+          failed_when: false
+          ignore_errors: true
+
+        - name: Set token from k8s_auth result
+          ansible.builtin.set_fact:
+            quickcourse_openshift_api_key: "{{ _k8s_auth_result.openshift_auth.api_key }}"
+          when:
+            - _k8s_auth_result is defined
+            - _k8s_auth_result.openshift_auth is defined
+            - _k8s_auth_result.openshift_auth.api_key | default('') | length > 0
+
+    # ----------------------------------------------------------------
+    # Step 3: fall back to oc CLI if credentials are still missing
     # ----------------------------------------------------------------
     - name: Generate token from oc session (fallback)
       when: quickcourse_openshift_api_key | default('') | length == 0
