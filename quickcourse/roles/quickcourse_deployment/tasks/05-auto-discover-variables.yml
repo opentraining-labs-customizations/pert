@@ -52,21 +52,22 @@
       ignore_errors: true
 
     # ----------------------------------------------------------------
-    # Step 1b: validate discovered token via oc login --token
-    #          if login fails, clear the key so step 2 can run
+    # Step 1b: validate discovered token via a real API call
+    #          if the token is rejected, clear it so step 2 can run
     # ----------------------------------------------------------------
-    - name: Validate discovered token via oc login
+    - name: Validate discovered token via API call
       when:
         - quickcourse_openshift_api_key | default('') | length > 0
         - quickcourse_openshift_api_url | default('') | length > 0
       block:
-        - name: Login to oc with discovered token
-          ansible.builtin.command: >
-            oc login {{ quickcourse_openshift_api_url }}
-            --token={{ quickcourse_openshift_api_key }}
-            --insecure-skip-tls-verify=true
-          register: _oc_token_login_result
-          changed_when: false
+        - name: Test token against cluster API
+          kubernetes.core.k8s_info:
+            host: "{{ quickcourse_openshift_api_url }}"
+            api_key: "{{ quickcourse_openshift_api_key }}"
+            validate_certs: false
+            kind: Namespace
+            name: default
+          register: _token_validation
           failed_when: false
           ignore_errors: true
           no_log: true
@@ -74,7 +75,7 @@
         - name: Clear invalid token so password fallback can run
           ansible.builtin.set_fact:
             quickcourse_openshift_api_key: ""
-          when: _oc_token_login_result.rc | default(1) != 0
+          when: _token_validation.failed | default(false)
 
     # ----------------------------------------------------------------
     # Step 2: username + password → oc login → fresh token
