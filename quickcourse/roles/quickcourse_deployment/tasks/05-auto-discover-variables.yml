@@ -86,14 +86,14 @@
       when:
         - quickcourse_openshift_api_key | default('') | length == 0
         - openshift_username | default('') | length > 0
-        - openshift_password | default(common_password) | default('') | length > 0
+        - openshift_password | default('') | length > 0
         - quickcourse_openshift_api_url | default('') | length > 0
       block:
         - name: Login to OpenShift with username and password
           ansible.builtin.command: >
             oc login {{ quickcourse_openshift_api_url }}
             --username={{ openshift_username }}
-            --password={{ openshift_password | default(common_password) }}
+            --password={{ openshift_password }}
             --insecure-skip-tls-verify=true
           register: _oc_login_result
           changed_when: false
