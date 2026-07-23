@@ -14,6 +14,39 @@
     - quickcourse_deployment_ocp | default('no') in ['yes', 'true', true, 'Yes', 'YES']
   block:
     # ----------------------------------------------------------------
+    # Step 0a: derive API URL from openshift_cluster_console_url if not set
+    # console: https://console-openshift-console.apps.<cluster>
+    # api:     https://api.<cluster>:6443
+    # ----------------------------------------------------------------
+    - name: Derive API URL from openshift_cluster_console_url
+      ansible.builtin.set_fact:
+        quickcourse_openshift_api_url: >-
+          https://api.{{ openshift_cluster_console_url
+            | regex_replace('^https?://[^.]+\.apps\.', '')
+            | regex_replace('/$', '') }}:6443
+      when:
+        - openshift_cluster_console_url | default('') | length > 0
+        - quickcourse_openshift_api_url | default('') | length == 0
+      failed_when: false
+      ignore_errors: true
+
+    # ----------------------------------------------------------------
+    # Step 0b: extract password from openshift_user_passwords dict
+    # openshift_user_passwords: { admin: "secret", user1: "secret" }
+    # ----------------------------------------------------------------
+    - name: Extract password from openshift_user_passwords dict
+      ansible.builtin.set_fact:
+        openshift_password: "{{ openshift_user_passwords[openshift_username] }}"
+      when:
+        - openshift_user_passwords is defined
+        - openshift_user_passwords is mapping
+        - openshift_username | default('') | length > 0
+        - openshift_username in openshift_user_passwords
+        - openshift_password | default('') | length == 0
+      failed_when: false
+      ignore_errors: true
+
+    # ----------------------------------------------------------------
     # Step 1: scan playbook variable scope for any *openshift_api_key*
     #         or *openshift_bearer_token* variable (exclude internal ones)
     # ----------------------------------------------------------------
