@@ -50,32 +50,42 @@
       ignore_errors: true
 
     # ----------------------------------------------------------------
-    # Step 2: username + password → token via k8s_auth
+    # Step 2: username + password → oc login → token
+    # Falls back to common_password if openshift_password not set
     # ----------------------------------------------------------------
-    - name: Authenticate with username and password to obtain token
+    - name: Authenticate with username and password via oc login
       when:
         - quickcourse_openshift_api_key | default('') | length == 0
         - openshift_username | default('') | length > 0
         - openshift_password | default(common_password) | default('') | length > 0
         - quickcourse_openshift_api_url | default('') | length > 0
       block:
-        - name: Exchange credentials for token via k8s_auth
-          kubernetes.core.k8s_auth:
-            host: "{{ quickcourse_openshift_api_url }}"
-            username: "{{ openshift_username }}"
-            password: "{{ openshift_password | default(common_password) }}"
-            validate_certs: "{{ quickcourse_openshift_validate_certs | default(false) }}"
-          register: _k8s_auth_result
+        - name: Login to OpenShift with username and password
+          ansible.builtin.command: >
+            oc login {{ quickcourse_openshift_api_url }}
+            --username={{ openshift_username }}
+            --password={{ openshift_password | default(common_password) }}
+            --insecure-skip-tls-verify=true
+          register: _oc_login_result
+          changed_when: false
           failed_when: false
           ignore_errors: true
+          no_log: true
 
-        - name: Set token from k8s_auth result
+        - name: Get token after oc login
+          ansible.builtin.command: oc whoami --show-token
+          register: _oc_token_after_login
+          changed_when: false
+          failed_when: false
+          ignore_errors: true
+          when: _oc_login_result.rc | default(1) == 0
+
+        - name: Set token from oc login
           ansible.builtin.set_fact:
-            quickcourse_openshift_api_key: "{{ _k8s_auth_result.openshift_auth.api_key }}"
+            quickcourse_openshift_api_key: "{{ _oc_token_after_login.stdout | trim }}"
           when:
-            - _k8s_auth_result is defined
-            - _k8s_auth_result.openshift_auth is defined
-            - _k8s_auth_result.openshift_auth.api_key | default('') | length > 0
+            - _oc_login_result.rc | default(1) == 0
+            - _oc_token_after_login.stdout | default('') | trim | length > 0
 
     # ----------------------------------------------------------------
     # Step 3: fall back to oc CLI if credentials are still missing
