@@ -3,8 +3,10 @@
 # Priority:
 #   1. Any extra-var whose name contains 'openshift_api_key' or 'openshift_bearer_token'
 #      (e.g. sandbox_openshift_api_key) - internal quickcourse_ vars are excluded
-#   2. openshift_username + openshift_password  →  k8s_auth token exchange
-#   3. oc whoami --show-token (if oc is present and logged in)
+#      → validates by attempting oc login --token; if login fails, falls through to step 2
+#   2. openshift_username + openshift_password → oc login → fresh token
+#      Falls back to common_password if openshift_password not set
+#   3. oc whoami --show-token (if oc is present and already logged in)
 # All tasks are non-blocking.
 
 - name: Auto-discover OpenShift credentials
@@ -50,8 +52,34 @@
       ignore_errors: true
 
     # ----------------------------------------------------------------
-    # Step 2: username + password → oc login → token
-    # Falls back to common_password if openshift_password not set
+    # Step 1b: validate discovered token via oc login --token
+    #          if login fails, clear the key so step 2 can run
+    # ----------------------------------------------------------------
+    - name: Validate discovered token via oc login
+      when:
+        - quickcourse_openshift_api_key | default('') | length > 0
+        - quickcourse_openshift_api_url | default('') | length > 0
+      block:
+        - name: Login to oc with discovered token
+          ansible.builtin.command: >
+            oc login {{ quickcourse_openshift_api_url }}
+            --token={{ quickcourse_openshift_api_key }}
+            --insecure-skip-tls-verify=true
+          register: _oc_token_login_result
+          changed_when: false
+          failed_when: false
+          ignore_errors: true
+          no_log: true
+
+        - name: Clear invalid token so password fallback can run
+          ansible.builtin.set_fact:
+            quickcourse_openshift_api_key: ""
+          when: _oc_token_login_result.rc | default(1) != 0
+
+    # ----------------------------------------------------------------
+    # Step 2: username + password → oc login → fresh token
+    #         runs when: key is empty OR discovered token failed validation
+    #         Falls back to common_password if openshift_password not set
     # ----------------------------------------------------------------
     - name: Authenticate with username and password via oc login
       when:
