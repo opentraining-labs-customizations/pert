@@ -1,20 +1,20 @@
 ---
 # Auto-discover OpenShift credentials before validation runs.
 # Priority:
-#   1. Any extra-var whose name contains 'openshift_api_key' or 'openshift_bearer_token'
-#      (e.g. sandbox_openshift_api_key) - internal quickcourse_ vars are excluded
-#      → validates by attempting oc login --token; if login fails, falls through to step 2
-#   2. openshift_username + openshift_password → oc login → fresh token
-#      Falls back to common_password if openshift_password not set
-#   3. oc whoami --show-token (if oc is present and already logged in)
-# All tasks are non-blocking.
+#   1. Derive API URL from openshift_cluster_console_url
+#   2. varnames scan for any *openshift_api_key* or *openshift_bearer_token* var
+#   3. oc login with admin + common_admin_password → token
+#   4. OAuth token via uri module (works without oc in runner)
+#   5. Existing oc session fallback
+# All steps are non-blocking.
 
 - name: Auto-discover OpenShift credentials
   when:
     - quickcourse_deployment_ocp | default('no') in ['yes', 'true', true, 'Yes', 'YES']
   block:
+
     # ----------------------------------------------------------------
-    # Step 0a: derive API URL from openshift_cluster_console_url if not set
+    # Step 0a: derive API URL from openshift_cluster_console_url
     # console: https://console-openshift-console.apps.<cluster>
     # api:     https://api.<cluster>:6443
     # ----------------------------------------------------------------
@@ -27,22 +27,6 @@
       when:
         - openshift_cluster_console_url | default('') | length > 0
         - quickcourse_openshift_api_url | default('') | length == 0
-      failed_when: false
-      ignore_errors: true
-
-    # ----------------------------------------------------------------
-    # Step 0b: extract password from openshift_user_passwords dict
-    # openshift_user_passwords: { admin: "secret", user1: "secret" }
-    # ----------------------------------------------------------------
-    - name: Extract password from openshift_user_passwords dict
-      ansible.builtin.set_fact:
-        openshift_password: "{{ openshift_user_passwords[openshift_username] }}"
-      when:
-        - openshift_user_passwords is defined
-        - openshift_user_passwords is mapping
-        - openshift_username | default('') | length > 0
-        - openshift_username in openshift_user_passwords
-        - openshift_password | default('') | length == 0
       failed_when: false
       ignore_errors: true
 
@@ -85,48 +69,19 @@
       ignore_errors: true
 
     # ----------------------------------------------------------------
-    # Step 1b: validate discovered token via a real API call
-    #          if the token is rejected, clear it so step 2 can run
+    # Step 2: oc login with admin + common_admin_password → token
     # ----------------------------------------------------------------
-    - name: Validate discovered token via API call
-      when:
-        - quickcourse_openshift_api_key | default('') | length > 0
-        - quickcourse_openshift_api_url | default('') | length > 0
-      block:
-        - name: Test token against cluster API
-          kubernetes.core.k8s_info:
-            host: "{{ quickcourse_openshift_api_url }}"
-            api_key: "{{ quickcourse_openshift_api_key }}"
-            validate_certs: false
-            kind: Namespace
-            name: default
-          register: _token_validation
-          failed_when: false
-          ignore_errors: true
-          no_log: true
-
-        - name: Clear invalid token so password fallback can run
-          ansible.builtin.set_fact:
-            quickcourse_openshift_api_key: ""
-          when: _token_validation.failed | default(false)
-
-    # ----------------------------------------------------------------
-    # Step 2: username + password → oc login → fresh token
-    #         runs when: key is empty OR discovered token failed validation
-    #         Falls back to common_password if openshift_password not set
-    # ----------------------------------------------------------------
-    - name: Authenticate with username and password via oc login
+    - name: Login with username and common_admin_password via oc
       when:
         - quickcourse_openshift_api_key | default('') | length == 0
-        - openshift_username | default('') | length > 0
-        - openshift_password | default('') | length > 0
         - quickcourse_openshift_api_url | default('') | length > 0
+        - common_admin_password | default('') | length > 0
       block:
-        - name: Login to OpenShift with username and password
+        - name: oc login with admin credentials
           ansible.builtin.command: >
             oc login {{ quickcourse_openshift_api_url }}
-            --username={{ openshift_username }}
-            --password={{ openshift_password }}
+            --username={{ openshift_username | default('admin') }}
+            --password={{ common_admin_password }}
             --insecure-skip-tls-verify=true
           register: _oc_login_result
           changed_when: false
@@ -150,7 +105,54 @@
             - _oc_token_after_login.stdout | default('') | trim | length > 0
 
     # ----------------------------------------------------------------
-    # Step 3: fall back to oc CLI if credentials are still missing
+    # Step 3: OAuth token via uri module (works without oc in runner)
+    # ----------------------------------------------------------------
+    - name: Get token via OpenShift OAuth API (no oc required)
+      when:
+        - quickcourse_openshift_api_key | default('') | length == 0
+        - quickcourse_openshift_api_url | default('') | length > 0
+        - common_admin_password | default('') | length > 0
+      block:
+        - name: Derive OAuth endpoint from API URL
+          ansible.builtin.set_fact:
+            _oauth_host: >-
+              oauth-openshift.apps.{{ quickcourse_openshift_api_url
+                | regex_replace('^https://api\.', '')
+                | regex_replace(':6443$', '') }}
+          failed_when: false
+          ignore_errors: true
+
+        - name: Request OAuth token via HTTP
+          ansible.builtin.uri:
+            url: "https://{{ _oauth_host }}/oauth/authorize?response_type=token&client_id=openshift-challenging-client"
+            method: GET
+            user: "{{ openshift_username | default('admin') }}"
+            password: "{{ common_admin_password }}"
+            force_basic_auth: true
+            validate_certs: false
+            follow_redirects: none
+            headers:
+              X-CSRF-Token: "1"
+            status_code: [200, 302, 301, 401, 403]
+          register: _oauth_response
+          failed_when: false
+          ignore_errors: true
+          no_log: true
+
+        - name: Extract token from OAuth redirect Location header
+          ansible.builtin.set_fact:
+            quickcourse_openshift_api_key: >-
+              {{ _oauth_response.location
+                 | regex_search('access_token=([^&]+)', '\1')
+                 | first }}
+          when:
+            - _oauth_response.location is defined
+            - "'access_token=' in _oauth_response.location"
+          failed_when: false
+          ignore_errors: true
+
+    # ----------------------------------------------------------------
+    # Step 4: fall back to existing oc session
     # ----------------------------------------------------------------
     - name: Generate token from oc session (fallback)
       when: quickcourse_openshift_api_key | default('') | length == 0
@@ -183,7 +185,7 @@
       ansible.builtin.debug:
         msg: >-
           OpenShift credentials resolved —
-          source={{ _discovered_key_vars[0] | default('oc-session') }},
+          source={{ _discovered_key_vars[0] | default('password-auth') }},
           api={{ quickcourse_openshift_api_url | default('(not set)') }}
         verbosity: 1
       when: quickcourse_openshift_api_key | default('') | length > 0
