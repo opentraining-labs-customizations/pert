@@ -58,11 +58,41 @@
   loop: "{{ quickcourse_collected_vars | default({}) | dict2items }}"
   when: quickcourse_collected_vars | default({}) | length > 0
 
-- name: Join variable lines
+- name: Split variables into chunks to avoid ConfigMap size limit
   set_fact:
-    quickcourse_asciidoc_attributes: "{{ quickcourse_var_lines | default([]) | join('\n') }}"
+    _configmap_size_limit: 1048576
+    _chunk_size_target: 900000
+    _all_var_lines: "{{ quickcourse_var_lines | default([]) }}"
 
-- name: Create ConfigMap for variables (to avoid argument list too long)
+- name: Build variable chunks
+  set_fact:
+    _var_chunks: []
+    _current_chunk: []
+    _current_size: 0
+
+- name: Distribute variables across chunks
+  set_fact:
+    _var_chunks: "{{ _var_chunks + [_current_chunk] }}"
+    _current_chunk: []
+    _current_size: 0
+  loop: "{{ _all_var_lines }}"
+  vars:
+    _line_size: "{{ (item + '\n') | length }}"
+  when:
+    - (_current_size | int) + (_line_size | int) > (_chunk_size_target | int)
+
+- name: Add remaining variables to current chunk
+  set_fact:
+    _current_chunk: "{{ _current_chunk + [item] }}"
+    _current_size: "{{ (_current_size | int) + ((item + '\n') | length) }}"
+  loop: "{{ _all_var_lines }}"
+
+- name: Add final chunk if not empty
+  set_fact:
+    _var_chunks: "{{ _var_chunks + [_current_chunk] }}"
+  when: _current_chunk | length > 0
+
+- name: Create ConfigMaps for variable chunks
   kubernetes.core.k8s:
     host: "{{ quickcourse_openshift_api_url }}"
     api_key: "{{ quickcourse_openshift_api_key }}"
@@ -74,11 +104,25 @@
       apiVersion: v1
       kind: ConfigMap
       metadata:
-        name: quickcourse-vars
+        name: "quickcourse-vars-{{ item.0 }}"
         namespace: "{{ quickcourse_ocp_namespace }}"
       data:
-        variables.txt: "{{ quickcourse_asciidoc_attributes }}"
-  when: quickcourse_asciidoc_attributes | default('') | length > 0
+        variables.txt: "{{ item.1 | join('\n') }}"
+  loop: "{{ _var_chunks | enumerate }}"
+  loop_control:
+    label: "chunk-{{ item.0 }}"
+  when:
+    - _var_chunks | length > 0
+    - (item.1 | join('\n')) | length > 0
+
+- name: Set primary ConfigMap fact (for backward compatibility)
+  set_fact:
+    quickcourse_asciidoc_attributes: "{{ (_var_chunks[0] | default([])) | join('\n') }}"
+  when: _var_chunks | length > 0
+
+- name: Set ConfigMap count
+  set_fact:
+    quickcourse_vars_configmap_count: "{{ _var_chunks | length }}"
 
 - name: Set volume mounts for init container
   set_fact:
@@ -88,10 +132,11 @@
       - name: build
         mountPath: /build
 
-- name: Add ConfigMap volume mount if variables exist
+- name: Add ConfigMap volume mounts if variables exist
   set_fact:
-    _init_volume_mounts: "{{ _init_volume_mounts + [{'name': 'quickcourse-vars', 'mountPath': '/var/quickcourse'}] }}"
-  when: quickcourse_asciidoc_attributes | default('') | length > 0
+    _init_volume_mounts: "{{ _init_volume_mounts + [{'name': 'quickcourse-vars-' + (item | string), 'mountPath': '/var/quickcourse/' + (item | string)}] }}"
+  loop: "{{ range(0, quickcourse_vars_configmap_count | default(0) | int) | list }}"
+  when: quickcourse_vars_configmap_count | default(0) | int > 0
 
 - name: Set volumes list
   set_fact:
@@ -101,10 +146,11 @@
       - name: build
         emptyDir: {}
 
-- name: Add ConfigMap volume if variables exist
+- name: Add ConfigMap volumes if variables exist
   set_fact:
-    _pod_volumes: "{{ _pod_volumes + [{'name': 'quickcourse-vars', 'configMap': {'name': 'quickcourse-vars'}}] }}"
-  when: quickcourse_asciidoc_attributes | default('') | length > 0
+    _pod_volumes: "{{ _pod_volumes + [{'name': 'quickcourse-vars-' + (item | string), 'configMap': {'name': 'quickcourse-vars-' + (item | string)}}] }}"
+  loop: "{{ range(0, quickcourse_vars_configmap_count | default(0) | int) | list }}"
+  when: quickcourse_vars_configmap_count | default(0) | int > 0
 
 - name: Create Quick Course Pod with variable injection
   kubernetes.core.k8s:
@@ -138,9 +184,10 @@
             {% if quickcourse_git_ref != 'main' %}
             git checkout {{ quickcourse_git_ref }} &&
             {% endif %}
-            {% if quickcourse_asciidoc_attributes | default('') | length > 0 %}
-            if [ -f /var/quickcourse/variables.txt ]; then
-              cp /var/quickcourse/variables.txt /tmp/vars.txt &&
+            {% if quickcourse_vars_configmap_count | default(0) | int > 0 %}
+            echo "=== Merging {{ quickcourse_vars_configmap_count }} ConfigMap chunks ===" &&
+            cat /var/quickcourse/*/variables.txt > /tmp/vars.txt 2>/dev/null || true &&
+            if [ -s /tmp/vars.txt ]; then
               echo "" >> /tmp/vars.txt &&
               awk '/^  attributes:$/ {print; system("cat /tmp/vars.txt"); next} 1' antora-playbook.yml > /tmp/playbook.yml &&
               mv /tmp/playbook.yml antora-playbook.yml &&
@@ -148,7 +195,7 @@
               echo "=== Variables Injected ===" &&
               tail -30 antora-playbook.yml
             else
-              echo "=== No ConfigMap found, skipping variable injection ==="
+              echo "=== No variables found in ConfigMaps, skipping variable injection ==="
             fi &&
             {% else %}
             echo "=== No variables to inject ===" &&
@@ -246,6 +293,21 @@
   set_fact:
     quickcourse_primary_view_url: "https://{{ quickcourse_route_info.resources[0].spec.host }}/"
 
+- name: Display ConfigMap distribution
+  debug:
+    msg: |
+      ========================================
+      ConfigMap Distribution
+      ========================================
+      Total ConfigMaps: {{ quickcourse_vars_configmap_count | default(0) }}
+      {% if quickcourse_vars_configmap_count | default(0) | int > 0 %}
+      Chunk sizes (bytes):
+      {% for chunk in _var_chunks %}
+      - Chunk {{ loop.index0 }}: {{ (chunk | join('\n')) | length }} bytes
+      {% endfor %}
+      {% endif %}
+  when: quickcourse_collected_vars | default({}) | length > 0
+
 - name: Display Quick Course deployment summary
   debug:
     msg: |
@@ -257,4 +319,5 @@
       Namespace: {{ quickcourse_ocp_namespace }}
 
       Variables injected: {{ quickcourse_collected_vars.keys() | list | length }} variables
+      ConfigMaps created: {{ quickcourse_vars_configmap_count | default(0) }}
       ========================================
