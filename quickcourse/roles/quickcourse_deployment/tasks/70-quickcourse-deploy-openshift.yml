@@ -64,33 +64,29 @@
     _chunk_size_target: 900000
     _all_var_lines: "{{ quickcourse_var_lines | default([]) }}"
 
-- name: Build variable chunks
+- name: Build variable chunks using Python
   set_fact:
-    _var_chunks: []
-    _current_chunk: []
-    _current_size: 0
-
-- name: Distribute variables across chunks
-  set_fact:
-    _var_chunks: "{{ _var_chunks + [_current_chunk] }}"
-    _current_chunk: []
-    _current_size: 0
-  loop: "{{ _all_var_lines }}"
+    _var_chunks: "{{ _var_chunks | default([]) }}"
   vars:
-    _line_size: "{{ (item + '\n') | length }}"
-  when:
-    - (_current_size | int) + (_line_size | int) > (_chunk_size_target | int)
-
-- name: Add remaining variables to current chunk
-  set_fact:
-    _current_chunk: "{{ _current_chunk + [item] }}"
-    _current_size: "{{ (_current_size | int) + ((item + '\n') | length) }}"
-  loop: "{{ _all_var_lines }}"
-
-- name: Add final chunk if not empty
-  set_fact:
-    _var_chunks: "{{ _var_chunks + [_current_chunk] }}"
-  when: _current_chunk | length > 0
+    _var_chunks: |
+      {%- set chunks = [] -%}
+      {%- set current_chunk = [] -%}
+      {%- set current_size = 0 -%}
+      {%- for line in _all_var_lines -%}
+        {%- set line_size = (line + '\n') | length -%}
+        {%- if (current_size + line_size) > _chunk_size_target and current_chunk | length > 0 -%}
+          {%- set _ = chunks.append(current_chunk) -%}
+          {%- set current_chunk = [line] -%}
+          {%- set current_size = line_size -%}
+        {%- else -%}
+          {%- set _ = current_chunk.append(line) -%}
+          {%- set current_size = current_size + line_size -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {%- if current_chunk | length > 0 -%}
+        {%- set _ = chunks.append(current_chunk) -%}
+      {%- endif -%}
+      {{ chunks }}
 
 - name: Create ConfigMaps for variable chunks
   kubernetes.core.k8s:
@@ -104,16 +100,17 @@
       apiVersion: v1
       kind: ConfigMap
       metadata:
-        name: "quickcourse-vars-{{ item.0 }}"
+        name: "quickcourse-vars-{{ chunk_idx }}"
         namespace: "{{ quickcourse_ocp_namespace }}"
       data:
-        variables.txt: "{{ item.1 | join('\n') }}"
-  loop: "{{ _var_chunks | enumerate }}"
+        variables.txt: "{{ item | join('\n') }}"
+  loop: "{{ _var_chunks }}"
   loop_control:
-    label: "chunk-{{ item.0 }}"
+    index_var: chunk_idx
+    label: "chunk-{{ chunk_idx }}"
   when:
     - _var_chunks | length > 0
-    - (item.1 | join('\n')) | length > 0
+    - (item | join('\n')) | length > 0
 
 - name: Set primary ConfigMap fact (for backward compatibility)
   set_fact:
