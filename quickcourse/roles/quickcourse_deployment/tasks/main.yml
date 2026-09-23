@@ -48,6 +48,7 @@
         - item not in quickcourse_auto_collect_exclude | default([])
         - lookup('vars', item, default='__UNDEFINED__') != '__UNDEFINED__'
         - lookup('vars', item) is not mapping or (lookup('vars', item) is mapping and lookup('vars', item).keys() | list | length < 100)
+        - item is not regex('(manifest|job|email|template|repositories|satellite)', ignorecase=True)
       failed_when: false
 
     - name: Use custom attributes for variable injection (takes precedence)
